@@ -1,0 +1,13 @@
+# CacaoAI UI demo
+
+A standalone frontend mockup for sharing and reviewing the CacaoAI farm dashboard concept.
+
+## View
+
+Open `index.html` locally, or enable GitHub Pages from the `main` branch and `/ (root)` in the repository's Pages settings. The page is static HTML with bundled local images; pushing updates to `main` updates the published site.
+
+## Scope and data
+
+This repository contains only the UI prototype and generated illustrative cacao pod images. The sample images are not analyzed by CacaoAI. Photo Review deliberately shows no disease probability because no inference was run. Other counts, dates, map areas, and area-level model signals are invented demo values.
+
+The page does not connect to Drive/GAS, call the CacaoAI models, collect GPS, or save feedback. Do not use it for operational decisions or add real farm photos, precise locations, credentials, model weights, or customer records.

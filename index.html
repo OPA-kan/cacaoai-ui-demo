@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f5f7f2">
+  <title>CacaoAI — Field & Farm UI Concept</title>
+  <style>
+    :root {
+      --ink: #19251e; --muted: #718077; --line: #e2e9e2; --paper: #ffffff;
+      --canvas: #f5f7f2; --green: #176b4b; --green-2: #24835d; --mint: #e7f3eb;
+      --amber: #d68b22; --amber-bg: #fff4dc; --red: #c75342; --red-bg: #fbe9e5;
+      --blue: #4e7c9e; --blue-bg: #e9f1f6; --shadow: 0 16px 38px rgba(28, 50, 35, .07);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+    .sidebar { background: #173c2d; color: #eff8f0; display: flex; flex-direction: column; padding: 24px 16px 18px; }
+    .brand { display: flex; gap: 11px; align-items: center; padding: 4px 10px 25px; }
+    .brand-mark { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: #d7ecb5; color: #164b35; font-size: 21px; font-weight: 800; }
+    .brand strong { display: block; font-size: 16px; letter-spacing: .01em; }
+    .brand small { color: #b7d2be; font-size: 11px; }
+    .farm-switch { margin: 0 5px 24px; border: 1px solid #4b705d; background: #214936; color: white; border-radius: 11px; padding: 11px 12px; text-align: left; }
+    .farm-switch span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: #afd0b8; margin-bottom: 4px; }
+    .farm-switch strong { font-size: 13px; }
+    .nav-label { color: #98b9a3; font-size: 10px; letter-spacing: .11em; text-transform: uppercase; padding: 0 12px 8px; }
+    .nav { display: grid; gap: 5px; }
+    .nav button { border: 0; background: transparent; color: #d0e0d4; border-radius: 9px; display: flex; align-items: center; gap: 12px; padding: 11px 12px; text-align: left; font-size: 13px; }
+    .nav button:hover, .nav button.active { background: #2b5940; color: #fff; }
+    .nav .icon { width: 19px; text-align: center; font-size: 16px; }
+    .sidebar-spacer { flex: 1; }
+    .role-box { border-top: 1px solid #3a6149; padding: 16px 6px 0; }
+    .role-box p { color: #b7d2be; font-size: 10px; margin: 0 0 8px 5px; text-transform: uppercase; letter-spacing: .08em; }
+    .role-switch { display: flex; padding: 3px; gap: 3px; border: 1px solid #4b705d; border-radius: 9px; background: #214936; }
+    .role-switch button { flex: 1; padding: 7px 4px; border: 0; color: #c7d9cc; background: transparent; border-radius: 6px; font-size: 10px; }
+    .role-switch button.active { background: #e3f1db; color: #164b35; font-weight: 700; }
+    .role-hint { color: #9fbea8; font-size: 10px; line-height: 1.45; padding: 9px 5px 0; }
+
+    .main { min-width: 0; }
+    .topbar { height: 70px; background: rgba(255,255,255,.88); border-bottom: 1px solid var(--line); padding: 0 34px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); }
+    .crumb { color: var(--muted); font-size: 12px; }
+    .crumb strong { color: var(--ink); font-weight: 650; }
+    .top-actions { display: flex; gap: 10px; align-items: center; }
+    .demo-chip { padding: 7px 10px; border-radius: 20px; background: #fff1d5; color: #80500d; font-size: 10px; font-weight: 750; letter-spacing: .04em; }
+    .avatar { width: 33px; height: 33px; border-radius: 50%; display: grid; place-items: center; background: #dcebdc; color: var(--green); font-weight: 750; font-size: 12px; }
+    .content { max-width: 1440px; margin: auto; padding: 30px 34px 52px; }
+    .screen { display: none; animation: fade .18s ease-out; }
+    .screen.active { display: block; }
+    @keyframes fade { from { opacity: .5; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 22px; }
+    .eyebrow { color: var(--green); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
+    h1 { margin: 0; font-size: clamp(25px, 3vw, 33px); letter-spacing: -.04em; line-height: 1.13; }
+    .subtitle { color: var(--muted); margin: 8px 0 0; font-size: 13px; line-height: 1.55; }
+    .date-label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 15px; box-shadow: var(--shadow); }
+    .btn { border: 1px solid var(--line); border-radius: 9px; padding: 10px 14px; background: white; color: var(--ink); font-size: 12px; font-weight: 700; transition: .15s ease; }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 5px 12px #183d2d18; }
+    .btn.primary { color: white; background: var(--green); border-color: var(--green); }
+    .btn.primary:hover { background: #10583c; }
+    .btn.soft { background: var(--mint); color: var(--green); border-color: #d6e9da; }
+    .btn.warn { background: var(--amber-bg); color: #84550d; border-color: #f2dfb7; }
+    .btn.danger { background: var(--red-bg); color: #9d3c31; border-color: #f0d0ca; }
+    .status { display: inline-flex; gap: 6px; align-items: center; padding: 6px 9px; border-radius: 20px; font-size: 10px; font-weight: 750; white-space: nowrap; }
+    .status.green { background: var(--mint); color: #226548; }
+    .status.amber { background: var(--amber-bg); color: #86570f; }
+    .status.red { background: var(--red-bg); color: #a44337; }
+    .status.gray { background: #eef1ed; color: #68756b; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+    /* Photo intake */
+    .capture-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 20px; align-items: stretch; }
+    .capture-card { padding: 22px; }
+    .capture-card h2, .panel-head h2 { font-size: 15px; margin: 0; letter-spacing: -.02em; }
+    .capture-actions { display: flex; gap: 10px; margin-top: 14px; }
+    .capture-actions .btn { flex: 1; padding: 13px; }
+    .upload-progress { margin-top: 12px; padding: 10px 11px; background: #f6f9f5; border: 1px solid var(--line); border-radius: 9px; }
+    .upload-progress[hidden], .queue-progress[hidden] { display: none; }
+    .progress-head { display: flex; justify-content: space-between; gap: 10px; color: #56665a; font-size: 9px; margin-bottom: 7px; }
+    .progress-track { height: 5px; background: #e3ebe2; border-radius: 6px; overflow: hidden; }
+    .progress-track i { display: block; width: 0; height: 100%; background: var(--green-2); border-radius: inherit; transition: width .18s linear; }
+    .retry-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 9px; margin-top: 8px; }
+    .intake-hero { margin-top:16px; padding:20px; background:linear-gradient(135deg,#f0f6ed,#e5f1e5); border:1px solid #d8e8d8; border-radius:13px; display:flex; align-items:center; gap:16px; }
+    .drive-icon { flex:none; width:52px; height:52px; display:grid; place-items:center; border-radius:15px; background:white; color:var(--green); font-size:23px; box-shadow:0 4px 12px #294b3014; }
+    .intake-hero strong { display:block; font-size:13px; }
+    .intake-hero p { margin:5px 0 0; color:#637267; font-size:10px; line-height:1.5; }
+    .flow-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+    .flow-step { position:relative; padding:11px; border-radius:9px; background:#f7f9f5; color:#5a685e; font-size:9px; line-height:1.45; }
+    .flow-step b { display:block; color:var(--ink); font-size:10px; margin-bottom:3px; }
+    .flow-step i { font-style:normal; color:var(--green); font-weight:800; margin-right:4px; }
+    .storage-note { display:flex; gap:8px; align-items:flex-start; padding:11px 12px; margin-top:13px; border-radius:9px; background:#f8f9f6; color:#68756b; font-size:9px; line-height:1.45; }
+    .storage-note b { color:#405449; }
+    .queue-progress { margin-top:11px; padding:10px 11px; background:#f6f9f5; border:1px solid var(--line); border-radius:9px; }
+    .queue-row { padding:8px 0; border-bottom:1px solid #eff2ed; }
+    .queue-row:last-child { border-bottom:0; }
+    .queue-status { flex:none; }
+    .retry-small { padding:5px 8px; font-size:9px; }
+    .capture-side { padding: 21px; display: flex; flex-direction: column; }
+    .capture-side .side-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 17px; }
+    .side-title h2 { margin: 0; font-size: 14px; }
+    .day-count { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mini-stat { border-radius: 11px; background: #f7f9f5; padding: 14px; }
+    .mini-stat span { display: block; color: var(--muted); font-size: 10px; }
+    .mini-stat strong { display: block; font-size: 26px; letter-spacing: -.04em; margin-top: 5px; }
+    .mini-stat.review strong { color: var(--amber); }
+    .gps-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--line); font-size: 11px; }
+    .gps-row span { color: var(--muted); }
+    .upload-queue { margin-top: 15px; }
+    .queue-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 9px; }
+    .queue-list { display: grid; gap: 8px; }
+    .queue-row { display: flex; gap: 9px; align-items: center; min-width: 0; font-size: 10px; }
+    .queue-thumb { width: 33px; height: 33px; border-radius: 7px; object-fit: cover; background: #e8eee6; flex: none; }
+    .queue-meta { flex: 1; min-width: 0; }
+    .queue-meta strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+    .queue-meta small { color: var(--muted); font-size: 9px; }
+    .queue-check { color: var(--green); font-size: 15px; }
+
+    /* Overview */
+    .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 17px; }
+    .metric { padding: 17px 18px; }
+    .metric .metric-label { color: var(--muted); font-size: 11px; }
+    .metric .metric-value { font-size: 28px; letter-spacing: -.04em; font-weight: 750; margin: 8px 0 3px; }
+    .metric .metric-note { color: #849087; font-size: 10px; }
+    .metric.priority .metric-value { color: var(--red); }
+    .overview-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr); gap: 17px; }
+    .map-card { padding: 17px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .map-legend { display: flex; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 9px; }
+    .map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 3px; }
+    .farm-map { position: relative; height: 344px; overflow: hidden; border-radius: 11px; border: 1px solid #dce5dc; background-color: #eaf0e7; background-image: linear-gradient(35deg,transparent 48%,#d9e4d8 49%,#d9e4d8 50%,transparent 51%),linear-gradient(145deg,transparent 49%,#d9e4d8 50%,transparent 51%); background-size: 50px 46px, 70px 62px; }
+    .farm-map::before { content: ""; position: absolute; inset: 7% 5%; border: 2px solid #91ae86; border-radius: 44% 38% 34% 42% / 28% 40% 31% 38%; transform: rotate(-8deg); pointer-events: none; }
+    .map-water { position: absolute; right: -5%; bottom: -25%; width: 31%; height: 55%; border-radius: 50%; transform: rotate(-20deg); background: #d7e6e9; opacity: .9; }
+    .map-road { position: absolute; height: 13px; left: -3%; right: -2%; top: 50%; background: #dfe5d9; border-top: 1px solid #c8d4c7; border-bottom: 1px solid #c8d4c7; transform: rotate(-8deg); }
+    .map-road::after { content:""; position:absolute; height: 10px; width: 110%; left: -4%; top: 27px; background: #e0e6da; border-top: 1px solid #cbd7ca; border-bottom: 1px solid #cbd7ca; transform: rotate(13deg); }
+    .plot { position: absolute; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 5px; border-radius: 9px; background: #abc49a; border: 1px solid #87a979; box-shadow: 0 3px 7px #25452a18; transform: rotate(-8deg); }
+    .plot button { min-width: 15px; min-height: 20px; border: 0; border-radius: 3px; opacity: .95; transition: .15s; }
+    .plot button:hover { outline: 2px solid white; transform: scale(1.12); z-index: 2; }
+    .plot button.green-cell { background: #4d9b6d; }
+    .plot button.amber-cell { background: #e4b747; }
+    .plot button.red-cell { background: #d66e57; }
+    .plot-label { position: absolute; top: -21px; left: 2px; color: #344b38; font-size: 10px; font-weight: 800; letter-spacing: .06em; }
+    .plot-a { left: 13%; top: 20%; width: 27%; height: 27%; }
+    .plot-b { left: 49%; top: 16%; width: 30%; height: 28%; }
+    .plot-c { left: 24%; top: 62%; width: 28%; height: 24%; transform: rotate(-3deg); }
+    .plot-d { left: 63%; top: 61%; width: 23%; height: 23%; transform: rotate(4deg); }
+    .map-controls { position: absolute; top: 12px; right: 12px; display: grid; gap: 5px; }
+    .map-controls button { width: 29px; height: 29px; border: 1px solid #d5ded3; border-radius: 7px; background: white; color: #405b48; font-weight: 750; }
+    .map-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; color: var(--muted); font-size: 9px; }
+    .priority-card { padding: 17px; }
+    .priority-list { display: grid; gap: 8px; }
+    .priority-row { width: 100%; background: white; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; grid-template-columns: 25px 1fr auto; gap: 8px; align-items: center; transition: .15s; }
+    .priority-row:hover { border-color: #b4ceba; box-shadow: 0 5px 13px #173c2d10; transform: translateY(-1px); }
+    .rank { display: grid; place-items: center; width: 22px; height: 22px; background: #f2f4f0; border-radius: 50%; color: #637368; font-size: 10px; font-weight: 800; }
+    .priority-info strong { display: block; font-size: 11px; }
+    .priority-info small { color: var(--muted); font-size: 9px; }
+    .priority-count { color: #9e493c; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .action-callout { margin-top: 12px; padding: 13px; border-radius: 10px; background: #f7f8f3; color: #566458; font-size: 10px; line-height: 1.45; }
+    .action-callout strong { color: var(--ink); display: block; margin-bottom: 3px; }
+
+    /* Area detail */
+    .back-link { border: 0; padding: 0; margin: 0 0 14px; background: transparent; color: var(--green); font-size: 11px; font-weight: 700; }
+    .area-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .area-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .area-locator { display: grid; grid-template-columns: minmax(300px,1.15fr) minmax(220px,.85fr); gap: 18px; align-items: center; padding: 14px; margin: 16px 0; }
+    .locator-map { height: 146px; position: relative; overflow: hidden; border-radius: 10px; border: 1px solid #dce5dc; background-color: #eaf0e7; background-image: linear-gradient(35deg,transparent 48%,#d9e4d8 49%,#d9e4d8 50%,transparent 51%),linear-gradient(145deg,transparent 49%,#d9e4d8 50%,transparent 51%); background-size: 38px 34px, 54px 46px; }
+    .locator-map::before { content:""; position:absolute; inset:8% 5%; border:2px solid #91ae86; border-radius:44% 38% 34% 42% / 28% 40% 31% 38%; transform:rotate(-8deg); pointer-events:none; }
+    .locator-map::after { content:""; position:absolute; height:8px; left:-4%; right:-4%; top:51%; background:#dfe5d9; border-top:1px solid #c8d4c7; border-bottom:1px solid #c8d4c7; transform:rotate(-8deg); pointer-events:none; }
+    .locator-plot { position:absolute; z-index:1; width:23%; height:33%; border:1px solid #85a776; border-radius:7px; color:#173c2d; font-size:9px; font-weight:800; letter-spacing:.06em; box-shadow:0 2px 6px #25452a18; transition:.15s; }
+    .locator-plot.loc-a { left:12%; top:19%; background:#b9d2ae; }
+    .locator-plot.loc-b { left:53%; top:13%; width:29%; height:38%; background:#e7b7a8; }
+    .locator-plot.loc-c { left:24%; top:66%; width:27%; height:25%; background:#edd99b; }
+    .locator-plot.loc-d { left:67%; top:68%; width:22%; height:23%; background:#b9d2ae; }
+    .locator-plot:hover { filter:brightness(.96); transform:translateY(-1px); }
+    .locator-plot.selected { outline:3px solid #fff; box-shadow:0 0 0 3px #b94e3b,0 5px 12px #45382b40; z-index:3; }
+    .locator-selected-tag { position:absolute; top:4px; right:5px; padding:3px 5px; border-radius:5px; background:#fff; color:#a04435; font-size:7px; letter-spacing:.02em; }
+    .locator-details { padding:4px 6px 4px 0; }
+    .locator-details .eyebrow { margin-bottom:5px; font-size:9px; }
+    .locator-details h2 { margin:0; font-size:20px; letter-spacing:-.03em; }
+    .locator-details p { color:var(--muted); font-size:10px; line-height:1.45; margin:6px 0 10px; }
+    .locator-kpis { display:flex; gap:7px; margin:0 0 10px; }
+    .locator-kpis span { border-radius:7px; padding:5px 7px; background:#f3f6f1; color:#536158; font-size:9px; }
+    .locator-kpis strong { color:var(--ink); }
+    .locator-note { margin:7px 0 0 !important; color:#87938a !important; font-size:8px !important; }
+    .area-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 11px; margin: 20px 0 16px; }
+    .area-stat { padding: 14px 16px; }
+    .area-stat span { color: var(--muted); font-size: 10px; }
+    .area-stat strong { display: block; margin-top: 5px; font-size: 20px; }
+    .area-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(260px,.65fr); gap: 16px; }
+    .signals, .recent { padding: 18px; }
+    .signal-row { display: grid; grid-template-columns: 1fr 50px 90px; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #edf0eb; font-size: 11px; }
+    .signal-row:last-child { border-bottom: 0; }
+    .signal-count { text-align: right; font-weight: 800; }
+    .signal-bar { height: 5px; background: #eef1ed; border-radius: 9px; overflow: hidden; }
+    .signal-bar i { height: 100%; display: block; background: var(--amber); border-radius: inherit; }
+    .signal-row:first-of-type .signal-bar i { background: var(--red); }
+    .section-note { color: var(--muted); font-size: 9px; margin: 3px 0 8px; line-height: 1.45; }
+    .recent-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 9px; }
+    .photo-tile { border: 0; padding: 0; background: #f0f4ef; border-radius: 9px; overflow: hidden; text-align: left; color: var(--ink); }
+    .photo-tile img { width: 100%; height: 105px; object-fit: cover; display: block; }
+    .photo-tile span { display: block; padding: 8px; font-size: 9px; line-height: 1.35; }
+    .photo-tile b { display: block; font-size: 9px; margin-bottom: 2px; }
+    .action-panel { padding: 17px; margin-top: 15px; background: #eef5ee; border-color: #dceade; }
+    .action-panel h3 { margin: 0 0 8px; font-size: 12px; }
+    .action-panel ol { margin: 0; padding-left: 19px; color: #526357; font-size: 10px; line-height: 1.8; }
+    .confirm-state { display: none; margin-top: 12px; padding: 10px 11px; border-radius: 9px; font-size: 10px; }
+    .confirm-state.visible { display: block; }
+    .confirm-state.confirmed { background: var(--mint); color: #226548; }
+    .confirm-state.evidence { background: var(--amber-bg); color: #80550e; }
+
+    /* Weekly */
+    .report-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px; background: #173c2d; color: white; border-radius: 15px; margin-bottom: 16px; }
+    .report-banner small { color: #bfd7c3; font-size: 10px; }
+    .report-banner h2 { margin: 5px 0 0; font-size: 20px; letter-spacing: -.03em; }
+    .report-banner .btn { border-color: #83a38c; background: transparent; color: white; }
+    .week-grid { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(270px,.75fr); gap: 16px; }
+    .trend-card, .actions-card { padding: 19px; }
+    .trend-card h2, .actions-card h2 { font-size: 14px; margin: 0; }
+    .trend-chart { display: grid; grid-template-columns: 45px 1fr; gap: 9px; height: 210px; margin-top: 20px; }
+    .y-axis { display: flex; flex-direction: column; justify-content: space-between; text-align: right; color: #88948a; font-size: 9px; padding: 0 0 20px; }
+    .chart-area { position: relative; border-bottom: 1px solid #dce4dc; background: repeating-linear-gradient(to bottom,transparent 0,transparent 48px,#edf1ec 49px,#edf1ec 50px); }
+    .bars { height: 100%; display: flex; justify-content: space-around; align-items: flex-end; padding: 0 15px 0; }
+    .bar-group { height: 100%; width: 14%; display: flex; align-items: flex-end; justify-content: center; position: relative; }
+    .bar { width: 34px; max-width: 85%; height: var(--h); background: #c9dfcf; border-radius: 6px 6px 0 0; position: relative; }
+    .bar.current { background: #d9795c; }
+    .bar-group small { position: absolute; bottom: -20px; color: #78857b; font-size: 9px; white-space: nowrap; }
+    .bar-value { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); color: #647067; font-size: 9px; white-space: nowrap; }
+    .chart-note { color: var(--muted); font-size: 9px; margin: 29px 0 0; }
+    .weekly-actions { display: grid; gap: 10px; margin-top: 14px; }
+    .weekly-action { display: flex; gap: 10px; align-items: flex-start; padding: 11px; border-radius: 9px; background: #f7f9f5; font-size: 10px; line-height: 1.45; }
+    .action-num { flex: none; width: 21px; height: 21px; border-radius: 7px; background: #e3eee1; color: var(--green); display: grid; place-items: center; font-size: 9px; font-weight: 800; }
+    .weekly-action strong { display: block; margin-bottom: 2px; font-size: 10px; }
+    .pending-card { display: flex; gap: 12px; align-items: center; padding: 15px; margin-top: 15px; border: 1px solid #f1dfb9; border-radius: 11px; background: #fff9eb; }
+    .pending-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; background: #ffefc9; color: #926116; font-size: 17px; }
+    .pending-card strong { display: block; font-size: 11px; }
+    .pending-card span { color: #866e48; font-size: 9px; }
+
+    /* Photo review modal and feedback */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(16,34,23,.58); z-index: 40; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .modal-backdrop.open { display: flex; }
+    .review-modal { max-width: 960px; width: 100%; max-height: 92vh; overflow: auto; background: white; border-radius: 16px; box-shadow: 0 24px 70px #10221855; display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,.8fr); position: relative; }
+    .review-photo { min-height: 410px; background: #e9eee8; display: grid; place-items: center; border-radius: 16px 0 0 16px; overflow: hidden; }
+    .review-photo img { width: 100%; height: 100%; min-height: 410px; object-fit: cover; }
+    .review-details { padding: 24px; }
+    .modal-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 1px solid var(--line); background: white; border-radius: 50%; font-size: 16px; z-index: 2; }
+    .review-details h2 { font-size: 20px; margin: 13px 0 5px; }
+    .review-details p { color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .review-kv { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 10px; }
+    .review-kv span { color: var(--muted); }
+    .review-actions { display:grid; gap:7px; margin-top:16px; }
+    .review-actions .btn { text-align:left; }
+    .notes { margin-top: 13px; }
+    .notes label { display:block; font-size:10px; font-weight:700; margin-bottom:6px; }
+    .notes textarea { resize: vertical; min-height:60px; width:100%; border:1px solid var(--line); border-radius:8px; padding:9px; font-size:10px; outline-color:var(--green); }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 60; opacity: 0; transform: translateY(12px); pointer-events:none; background:#193f2f; color:white; padding:12px 16px; border-radius:10px; box-shadow:0 10px 30px #10221833; font-size:11px; transition:.22s; }
+    .toast.show { opacity:1; transform:translateY(0); }
+    .small-print { color:#8a968d; font-size:9px; line-height:1.5; margin-top:14px; }
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 205px minmax(0,1fr); }
+      .content { padding:24px 22px 40px; } .topbar { padding:0 22px; }
+      .overview-layout, .area-grid, .week-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      .app { display:block; } .sidebar { padding:10px 12px; position:sticky; top:0; z-index:20; display:block; }
+      .brand { padding:0 5px 9px; } .brand-mark { width:30px; height:30px; border-radius:9px; font-size:17px; }
+      .farm-switch, .nav-label, .sidebar-spacer, .role-box { display:none; }
+      .nav { display:flex; overflow:auto; gap:3px; } .nav button { padding:8px 10px; flex:none; font-size:10px; gap:6px; }
+      .nav .icon { font-size:12px; width:auto; }
+      .topbar { height:48px; padding:0 14px; } .content { padding:20px 14px 34px; }
+      .page-head { align-items:flex-start; flex-direction:column; margin-bottom:16px; }
+      .capture-layout { grid-template-columns:1fr; } .metric-grid { grid-template-columns:repeat(2,1fr); }
+      .area-stat-grid { grid-template-columns:repeat(2,1fr); } .area-head { flex-direction:column; }
+      .area-head-actions { justify-content:flex-start; } .farm-map { height:300px; }
+      .area-locator { grid-template-columns:1fr; gap:10px; } .locator-map { height:132px; }
+      .review-modal { grid-template-columns:1fr; } .review-photo { border-radius:16px 16px 0 0; min-height:250px; max-height:35vh; }
+      .review-photo img { min-height:250px; } .review-details { padding:20px; }
+      .report-banner { align-items:flex-start; flex-direction:column; }
+    }
+    @media (max-width: 450px) {
+      .demo-chip { font-size:8px; padding:6px 7px; } .avatar { width:29px; height:29px; }
+      .capture-card, .capture-side { padding:16px; } .guide { grid-template-columns:1fr; }
+      .farm-map { height:260px; } .plot { gap:2px; padding:3px; } .plot button { min-height:15px; }
+      .priority-card, .map-card, .signals, .recent, .trend-card, .actions-card { padding:14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">C</div><div><strong>CacaoAI</strong><small>Field intelligence</small></div></div>
+      <button class="farm-switch" type="button"><span>Current farm</span><strong>Sample Cacao Farm⌄</strong></button>
+      <div class="nav-label">Workspace</div>
+      <nav class="nav" aria-label="Main navigation">
+        <button data-screen="capture"><span class="icon">▣</span>Photo inbox</button>
+        <button data-screen="overview" class="active"><span class="icon">⌖</span>Farm overview</button>
+        <button data-screen="area"><span class="icon">▦</span>Area detail</button>
+        <button data-screen="weekly"><span class="icon">▤</span>Weekly report</button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="role-box">
+        <p>Preview as</p>
+        <div class="role-switch"><button data-role="staff">Field staff</button><button data-role="manager" class="active">Manager</button></div>
+        <div class="role-hint" id="role-hint">Choose an area to plan the next inspection.</div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb">Sample Cacao Farm <span aria-hidden="true">/</span> <strong id="crumb-current">Farm overview</strong></div>
+        <div class="top-actions"><span class="demo-chip">ILLUSTRATIVE DEMO DATA</span><div class="avatar" title="Farm manager">VM</div></div>
+      </header>
+      <div class="content">
+        <!-- Screen 1: desktop photo inbox -->
+        <section class="screen" id="screen-capture" aria-labelledby="capture-title">
+          <div class="page-head"><div><div class="eyebrow">Field staff · Photo intake</div><h1 id="capture-title">Photo Inbox</h1><p class="subtitle">Photos from the farm arrive here for screening and follow-up. Capture them on a phone; manage the queue on desktop.</p></div><div class="date-label">Saturday, 31 October 2026</div></div>
+          <div class="capture-layout">
+            <section class="card capture-card">
+              <div class="panel-head"><h2>Farm photo storage</h2><span class="status green"><i class="dot"></i> Drive Inbox connected</span></div>
+              <div class="intake-hero"><div class="drive-icon">↗</div><div><strong>Incoming photos are read from the farm’s shared folder</strong><p>New files are processed in place. Original images stay in farm storage and are not copied into the dashboard.</p></div></div>
+              <div class="flow-steps">
+                <div class="flow-step"><b><i>01</i> Take the photo</b>Use the phone’s camera in the field.</div>
+                <div class="flow-step"><b><i>02</i> Add it to Drive</b>Upload to the farm’s shared Inbox folder.</div>
+                <div class="flow-step"><b><i>03</i> Check status here</b>Follow processing, review, or upload errors.</div>
+              </div>
+              <div class="capture-actions">
+                <button class="btn primary" id="open-drive" type="button">↗ &nbsp; Open shared Drive folder</button>
+                <button class="btn" id="add-photos" type="button">＋ &nbsp; Add from this computer</button>
+              </div>
+              <input id="manual-upload-input" type="file" accept="image/*" multiple hidden>
+              <div class="queue-progress" id="upload-progress" hidden>
+                <div class="progress-head"><span id="progress-label">Adding file to demo queue…</span><strong id="progress-percent">0%</strong></div>
+                <div class="progress-track"><i id="progress-fill"></i></div>
+                <div class="retry-row"><span>This is a local UI simulation; nothing is sent.</span><button class="btn retry-small" id="retry-upload" type="button" hidden>Retry</button></div>
+              </div>
+              <div class="storage-note"><span>ⓘ</span><span><b>Storage design:</b> keep original photos in Drive (or the farm’s chosen object storage); save lightweight metadata, thumbnails, and model results in CacaoAI.</span></div>
+            </section>
+            <aside class="card capture-side">
+              <div class="side-title"><h2>Today’s queue</h2><span class="status green"><i class="dot"></i> Synced 10:42 AM</span></div>
+              <div class="day-count">
+                <div class="mini-stat"><span>Analyzed</span><strong id="uploaded-count">12</strong></div>
+                <div class="mini-stat review"><span>Need field review</span><strong id="review-count">3</strong></div>
+              </div>
+              <div class="gps-row"><span>Waiting to process</span><strong id="waiting-count">4 photos</strong></div>
+              <div class="gps-row"><span>Upload issue</span><strong id="failed-count" style="color:var(--red)">1 photo</strong></div>
+              <div class="upload-queue">
+                <div class="queue-head"><span>Recent files</span><button class="btn retry-small" id="retry-failed" type="button">Retry failed (1)</button></div>
+                <div class="queue-list" id="queue-list">
+                  <div class="queue-row"><span class="queue-meta"><strong>IMG_1042.jpg</strong><small>Area B · Arrived 10:42 AM</small></span><span class="status green queue-status">Analyzed</span></div>
+                  <div class="queue-row"><span class="queue-meta"><strong>IMG_1041.jpg</strong><small>Area B · Arrived 10:39 AM</small></span><span class="status amber queue-status">Review</span></div>
+                  <div class="queue-row"><span class="queue-meta"><strong>IMG_1040.jpg</strong><small>Area A · Arrived 10:31 AM</small></span><span class="status gray queue-status">Queued</span></div>
+                  <div class="queue-row" id="failed-row"><span class="queue-meta"><strong>IMG_1039.jpg</strong><small>Sync paused · 10:18 AM</small></span><span class="status red queue-status">Retry</span></div>
+                </div>
+              </div>
+              <p class="small-print">Prototype only: Drive status and queue are sample data. The desktop page does not access a camera or upload anything.</p>
+            </aside>
+          </div>
+        </section>
+
+        <!-- Screen 2: farm manager overview -->
+        <section class="screen active" id="screen-overview" aria-labelledby="overview-title">
+          <div class="page-head"><div><div class="eyebrow">Farm manager · This week</div><h1 id="overview-title">Farm Health Overview</h1><p class="subtitle">A field-first view of where to spend inspection time.</p></div><div class="date-label">Last updated · 31 Oct 2026</div></div>
+          <div class="metric-grid">
+            <article class="card metric"><div class="metric-label">Photos analyzed</div><div class="metric-value">367</div><div class="metric-note">↑ 42 this week</div></article>
+            <article class="card metric"><div class="metric-label">Pods screened</div><div class="metric-value">475</div><div class="metric-note">Across 4 farm areas</div></article>
+            <article class="card metric priority"><div class="metric-label">Priority areas</div><div class="metric-value">3</div><div class="metric-note">Field confirmation recommended</div></article>
+            <article class="card metric"><div class="metric-label">Follow-up photos</div><div class="metric-value">12</div><div class="metric-note">Awaiting field review</div></article>
+          </div>
+          <div class="overview-layout">
+            <section class="card map-card">
+              <div class="panel-head"><h2>Sample farm · Area-level signals</h2><div class="map-legend"><span><i class="legend-dot" style="background:#4d9b6d"></i>No immediate warning</span><span><i class="legend-dot" style="background:#e4b747"></i>Follow-up</span><span><i class="legend-dot" style="background:#d66e57"></i>Priority</span></div></div>
+              <div class="farm-map" aria-label="Illustrative farm block heatmap">
+                <div class="map-water"></div><div class="map-road"></div>
+                <div class="plot plot-a" aria-label="Area A, 2 flagged out of 21"><span class="plot-label">AREA A</span>
+                  <button class="green-cell" data-area="A" aria-label="Area A grid cell"></button><button class="green-cell" data-area="A"></button><button class="amber-cell" data-area="A"></button><button class="green-cell" data-area="A"></button>
+                  <button class="green-cell" data-area="A"></button><button class="amber-cell" data-area="A"></button><button class="green-cell" data-area="A"></button><button class="green-cell" data-area="A"></button>
+                  <button class="green-cell" data-area="A"></button><button class="red-cell" data-area="A"></button><button class="green-cell" data-area="A"></button><button class="green-cell" data-area="A"></button>
+                </div>
+                <div class="plot plot-b" aria-label="Area B, 8 flagged out of 24"><span class="plot-label">AREA B</span>
+                  <button class="red-cell" data-area="B"></button><button class="amber-cell" data-area="B"></button><button class="red-cell" data-area="B"></button><button class="green-cell" data-area="B"></button>
+                  <button class="amber-cell" data-area="B"></button><button class="red-cell" data-area="B"></button><button class="red-cell" data-area="B"></button><button class="amber-cell" data-area="B"></button>
+                  <button class="green-cell" data-area="B"></button><button class="red-cell" data-area="B"></button><button class="green-cell" data-area="B"></button><button class="amber-cell" data-area="B"></button>
+                </div>
+                <div class="plot plot-c" aria-label="Area C, 3 flagged out of 18"><span class="plot-label">AREA C</span>
+                  <button class="green-cell" data-area="C"></button><button class="amber-cell" data-area="C"></button><button class="green-cell" data-area="C"></button><button class="green-cell" data-area="C"></button>
+                  <button class="amber-cell" data-area="C"></button><button class="green-cell" data-area="C"></button><button class="red-cell" data-area="C"></button><button class="green-cell" data-area="C"></button>
+                </div>
+                <div class="plot plot-d" aria-label="Area D, 1 flagged out of 31"><span class="plot-label">AREA D</span>
+                  <button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="amber-cell" data-area="D"></button>
+                  <button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button>
+                </div>
+                <div class="map-controls"><button aria-label="Zoom in" type="button">+</button><button aria-label="Zoom out" type="button">−</button></div>
+              </div>
+              <div class="map-caption"><span>Grid shading is an AI screening signal, not a confirmed disease map.</span><span>Illustrative layout · GPS coverage varies</span></div>
+            </section>
+            <aside class="card priority-card">
+              <div class="panel-head"><h2>Priority areas</h2><span class="status red"><i class="dot"></i> Inspect first</span></div>
+              <div class="priority-list">
+                <button class="priority-row" data-open-area="B"><span class="rank">1</span><span class="priority-info"><strong>Area B <span class="status red">Priority</span></strong><small>Last checked today · 24 photos</small></span><span class="priority-count">8 / 24</span></button>
+                <button class="priority-row" data-open-area="C"><span class="rank">2</span><span class="priority-info"><strong>Area C <span class="status amber">Follow-up</span></strong><small>Last checked 2 days ago · 18 photos</small></span><span class="priority-count">3 / 18</span></button>
+                <button class="priority-row" data-open-area="A"><span class="rank">3</span><span class="priority-info"><strong>Area A <span class="status amber">Follow-up</span></strong><small>Last checked yesterday · 21 photos</small></span><span class="priority-count">2 / 21</span></button>
+              </div>
+              <div class="action-callout"><strong>Suggested next step</strong>Visit Area B first and check the flagged pods in person. Small sample counts are shown beside every rate.</div>
+              <button class="btn soft" style="width:100%;margin-top:12px" data-screen="weekly">Open weekly report →</button>
+            </aside>
+          </div>
+          <p class="small-print">AI signals prioritize human inspection. They do not confirm disease. Sample counts and field validation status should be reviewed before action.</p>
+        </section>
+
+        <!-- Screen 3: area details -->
+        <section class="screen" id="screen-area" aria-labelledby="area-title">
+          <button class="back-link" data-screen="overview">← Back to farm overview</button>
+          <div class="page-head area-head"><div><div class="eyebrow">Farm manager · Area detail</div><h1 id="area-title">Area B — Priority Inspection</h1><p class="subtitle">Review the signal, then confirm what is actually present in the field.</p></div><div class="area-head-actions"><span class="status red" id="area-status"><i class="dot"></i> Priority inspection</span><button class="btn primary" id="start-inspection">Start inspection</button></div></div>
+          <section class="card area-locator" aria-label="Area location within the farm">
+            <div class="locator-map" id="locator-map">
+              <button class="locator-plot loc-a" data-locator-area="A" type="button" aria-label="Show Area A details">AREA A</button>
+              <button class="locator-plot loc-b selected" data-locator-area="B" type="button" aria-label="Currently viewing Area B details">AREA B <span class="locator-selected-tag">VIEWING</span></button>
+              <button class="locator-plot loc-c" data-locator-area="C" type="button" aria-label="Show Area C details">AREA C</button>
+              <button class="locator-plot loc-d" data-locator-area="D" type="button" aria-label="Show Area D details">AREA D</button>
+            </div>
+            <div class="locator-details">
+              <div class="eyebrow">Selected area on farm map</div>
+              <h2 id="locator-area-name">Area B</h2>
+              <p id="locator-copy">The highlighted block is the location for the details and photos shown below. Tap another block to switch areas.</p>
+              <div class="locator-kpis"><span><strong id="locator-photos">24</strong> photos</span><span><strong id="locator-flagged">8</strong> flagged for review</span></div>
+              <button class="btn" data-screen="overview" type="button">View full farm map →</button>
+              <p class="locator-note">Illustrative block layout; replace with the farm’s verified block map.</p>
+            </div>
+          </section>
+          <div class="area-stat-grid">
+            <article class="card area-stat"><span>Photos analyzed</span><strong id="area-photo-count">24</strong></article>
+            <article class="card area-stat"><span>Photos flagged</span><strong id="area-flagged-count">8</strong></article>
+            <article class="card area-stat"><span>Flagged rate</span><strong id="area-rate">33%</strong></article>
+            <article class="card area-stat"><span>Last checked</span><strong style="font-size:16px">31 Oct 2026</strong></article>
+          </div>
+          <div class="area-grid">
+            <section class="card signals">
+              <div class="panel-head"><h2>Possible signals</h2><span class="status gray">AI screening only</span></div>
+              <p class="section-note">Labels describe model-like patterns; confirm disease and pest presence in person.</p>
+              <div class="signal-row"><span>Black-pod-like</span><strong class="signal-count" id="signal-black">5</strong><div class="signal-bar"><i id="bar-black" style="width:63%"></i></div></div>
+              <div class="signal-row"><span>Pest-like</span><strong class="signal-count" id="signal-pest">2</strong><div class="signal-bar"><i id="bar-pest" style="width:25%"></i></div></div>
+              <div class="signal-row"><span>Other / review</span><strong class="signal-count" id="signal-other">1</strong><div class="signal-bar"><i id="bar-other" style="width:13%"></i></div></div>
+              <div class="action-panel">
+                <h3>Recommended next steps</h3>
+                <ol><li>Visit Area B</li><li>Inspect the flagged pods in person</li><li>Take close-up follow-up photos</li><li>Upload the photos to update this area</li></ol>
+              </div>
+              <div class="confirm-state" id="confirm-state"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:13px">
+                <button class="btn soft" id="mark-confirmed">✓ Mark as field-confirmed</button>
+                <button class="btn warn" id="needs-evidence">Needs more evidence</button>
+                <button class="btn" id="upload-followup">＋ Upload follow-up photos</button>
+              </div>
+              <input id="followup-input" type="file" accept="image/*" multiple hidden>
+            </section>
+            <aside class="card recent">
+              <div class="panel-head"><h2>Recent photos</h2><button class="btn" style="padding:7px 9px" data-open-review>View all</button></div>
+              <div class="recent-grid">
+                <button class="photo-tile" data-open-review data-photo="assets/pod-green-a.png"><img class="field-photo" alt="Illustrative close-up of a green cacao pod"><span><b>Sample image 01</b>Generated illustration · not analyzed</span></button>
+                <button class="photo-tile" data-open-review data-photo="assets/pod-bagged-a.png"><img class="field-photo" alt="Illustrative close-up of a cacao pod inside a clear protective bag"><span><b>Sample image 02</b>Generated illustration · not analyzed</span></button>
+                <button class="photo-tile" data-open-review data-photo="assets/pod-dark-green.png"><img class="field-photo" alt="Illustrative close-up of a dark green cacao pod"><span><b>Sample image 03</b>Generated illustration · not analyzed</span></button>
+                <button class="photo-tile" data-open-review data-photo="assets/pod-bagged-b.png"><img class="field-photo" alt="Illustrative close-up of a cacao pod inside a clear protective bag"><span><b>Sample image 04</b>Generated illustration · not analyzed</span></button>
+              </div>
+              <p class="small-print">Images, photo labels, and example results are illustrative mock data, not farm records or model outputs. Use field confirmation to record what staff observed.</p>
+            </aside>
+          </div>
+        </section>
+
+        <!-- Screen 4: weekly report -->
+        <section class="screen" id="screen-weekly" aria-labelledby="weekly-title">
+          <div class="page-head"><div><div class="eyebrow">Farm manager · Weekly action summary</div><h1 id="weekly-title">Weekly Farm Health Report</h1><p class="subtitle">A short list of places to revisit, with enough evidence to plan the week.</p></div><div class="date-label">Week of 26 Oct 2026</div></div>
+          <div class="report-banner"><div><small>SAMPLE CACAO FARM · WEEK 44</small><h2>3 areas may need a closer look.</h2></div><button class="btn" id="export-report">↓ &nbsp; Export summary</button></div>
+          <div class="metric-grid">
+            <article class="card metric"><div class="metric-label">Photos analyzed</div><div class="metric-value">367</div><div class="metric-note">This week</div></article>
+            <article class="card metric priority"><div class="metric-label">Priority areas</div><div class="metric-value">3</div><div class="metric-note">Field checks recommended</div></article>
+            <article class="card metric"><div class="metric-label">Follow-up photos pending</div><div class="metric-value">12</div><div class="metric-note">Upload after field visits</div></article>
+            <article class="card metric"><div class="metric-label">Field-confirmed</div><div class="metric-value" id="confirmed-total">4</div><div class="metric-note">Staff feedback this week</div></article>
+          </div>
+          <div class="week-grid">
+            <section class="card trend-card">
+              <div class="panel-head"><h2>Area B · flagged-photo share</h2><span class="status amber">Review recommended</span></div>
+              <p class="section-note">Share of photos flagged for review. Counts are small; compare with the sample size.</p>
+              <div class="trend-chart"><div class="y-axis"><span>40%</span><span>30%</span><span>20%</span><span>10%</span><span>0%</span></div><div class="chart-area"><div class="bars">
+                <div class="bar-group"><div class="bar" style="--h:38%"><span class="bar-value">15%</span></div><small>Wk 40</small></div>
+                <div class="bar-group"><div class="bar" style="--h:45%"><span class="bar-value">18%</span></div><small>Wk 41</small></div>
+                <div class="bar-group"><div class="bar" style="--h:35%"><span class="bar-value">14%</span></div><small>Wk 42</small></div>
+                <div class="bar-group"><div class="bar" style="--h:53%"><span class="bar-value">21%</span></div><small>Wk 43</small></div>
+                <div class="bar-group"><div class="bar current" style="--h:83%"><span class="bar-value">33%</span></div><small>This week</small></div>
+              </div></div></div>
+              <p class="chart-note">Current sample: 8 of 24 photos flagged. A higher share is a cue to inspect, not a disease diagnosis.</p>
+            </section>
+            <aside class="card actions-card">
+              <div class="panel-head"><h2>Recommended actions</h2><span class="status green">This week</span></div>
+              <div class="weekly-actions">
+                <div class="weekly-action"><span class="action-num">1</span><span><strong>Inspect Area B first</strong>8 of 24 photos flagged · increased from 18% last week.</span></div>
+                <div class="weekly-action"><span class="action-num">2</span><span><strong>Review black-pod-like signals</strong>Check five flagged examples during the field visit.</span></div>
+                <div class="weekly-action"><span class="action-num">3</span><span><strong>Recheck Area C next week</strong>3 of 18 photos flagged; compare after follow-up.</span></div>
+              </div>
+              <div class="pending-card"><div class="pending-icon">↻</div><div><strong>12 follow-up photos pending</strong><span>Upload after the next field inspection.</span></div></div>
+              <button class="btn primary" style="width:100%;margin-top:14px" data-open-area="B">Open Area B details →</button>
+            </aside>
+          </div>
+          <p class="small-print">Trend is illustrative demo data. Rates can shift when capture volume or model version changes; always show the denominator and field-check before interpreting.</p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Photo Review is a modal reached from an area's recent-photo list. -->
+  <div class="modal-backdrop" id="review-backdrop" role="dialog" aria-modal="true" aria-labelledby="review-title">
+    <div class="review-modal">
+      <button class="modal-close" id="close-review" aria-label="Close photo review">×</button>
+      <div class="review-photo"><img class="field-photo" id="review-photo" alt="Original cacao pod photo"></div>
+      <div class="review-details">
+        <span class="status gray"><i class="dot"></i> Illustrative sample · not analyzed</span>
+        <h2 id="review-title">Photo Review</h2>
+        <p>This generated sample image has not been analyzed by a CacaoAI model. Real model output will appear here after inference.</p>
+        <div class="review-kv"><span>Farm area</span><strong>Area B · Sample Cacao Farm</strong></div>
+        <div class="review-kv"><span>Image type</span><strong>Generated illustration</strong></div>
+        <div class="review-kv"><span>Pod detection</span><strong>Not evaluated</strong></div>
+        <div class="review-kv"><span>Model result</span><strong>Not available · no inference run</strong></div>
+        <div class="review-actions">
+          <button class="btn soft" data-review-choice="confirmed">✓ &nbsp; Confirmed in field</button>
+          <button class="btn" data-review-choice="not-confirmed">○ &nbsp; Not confirmed</button>
+          <button class="btn warn" data-review-choice="more-photo">＋ &nbsp; Need another photo</button>
+        </div>
+        <div class="notes"><label for="review-notes">Field notes</label><textarea id="review-notes" placeholder="What did you observe? (optional)"></textarea></div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // Offline interaction prototype. No inference, Drive upload, or persistent backend is connected.
+    const photoTiles = [...document.querySelectorAll('.photo-tile')];
+    photoTiles.forEach(tile => { tile.querySelector('.field-photo').src = tile.dataset.photo; });
+    const reviewPhoto = document.getElementById('review-photo');
+    reviewPhoto.src = photoTiles[0]?.dataset.photo || '';
+    const names = { capture: 'Photo inbox', overview: 'Farm overview', area: 'Area detail', weekly: 'Weekly report' };
+    const screens = [...document.querySelectorAll('.screen')];
+    const navButtons = [...document.querySelectorAll('[data-screen]')];
+    let selectedArea = 'B';
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message; toast.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+    function showScreen(name) {
+      screens.forEach(screen => screen.classList.toggle('active', screen.id === `screen-${name}`));
+      document.getElementById('crumb-current').textContent = names[name] || 'Farm overview';
+      document.querySelectorAll('.nav button').forEach(button => button.classList.toggle('active', button.dataset.screen === name));
+      if (name === 'capture') document.getElementById('role-hint').textContent = 'Check files arriving from the farm’s shared photo folder.';
+      else document.getElementById('role-hint').textContent = 'Choose an area to plan the next inspection.';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    navButtons.forEach(button => button.addEventListener('click', () => showScreen(button.dataset.screen)));
+    function openArea(key = 'B') {
+      selectedArea = key;
+      const data = {
+        B: { title: 'Area B — Priority Inspection', photos: '24', flagged: '8', rate: '33%', tone: 'red', badge: 'Priority inspection', signals: [5, 2, 1] },
+        C: { title: 'Area C — Follow-up Recommended', photos: '18', flagged: '3', rate: '17%', tone: 'amber', badge: 'Follow-up recommended', signals: [2, 1, 0] },
+        A: { title: 'Area A — Follow-up Recommended', photos: '21', flagged: '2', rate: '10%', tone: 'amber', badge: 'Follow-up recommended', signals: [1, 1, 0] },
+        D: { title: 'Area D — No Immediate Warning', photos: '31', flagged: '1', rate: '3%', tone: 'green', badge: 'No immediate warning', signals: [0, 1, 0] }
+      }[key] || { title: `Area ${key}`, photos: '—', flagged: '—', rate: '—', tone: 'gray', badge: 'Needs review' };
+      document.getElementById('area-title').textContent = data.title;
+      document.getElementById('area-photo-count').textContent = data.photos;
+      document.getElementById('area-flagged-count').textContent = data.flagged;
+      document.getElementById('area-rate').textContent = data.rate;
+      document.getElementById('locator-area-name').textContent = `Area ${key}`;
+      document.getElementById('locator-copy').textContent = `The highlighted block is the location for the details and photos shown below. Tap another block to switch areas.`;
+      document.getElementById('locator-photos').textContent = data.photos;
+      document.getElementById('locator-flagged').textContent = data.flagged;
+      document.querySelectorAll('[data-locator-area]').forEach(plot => {
+        const selected = plot.dataset.locatorArea === key;
+        plot.classList.toggle('selected', selected);
+        plot.setAttribute('aria-label', selected ? `Currently viewing Area ${key} details` : `Show Area ${plot.dataset.locatorArea} details`);
+        const tag = plot.querySelector('.locator-selected-tag');
+        if (tag) tag.remove();
+        if (selected) {
+          const selectedTag = document.createElement('span'); selectedTag.className = 'locator-selected-tag'; selectedTag.textContent = 'VIEWING';
+          plot.appendChild(selectedTag);
+        }
+      });
+      if (data.signals) {
+        ['black', 'pest', 'other'].forEach((name, index) => {
+          document.getElementById(`signal-${name}`).textContent = data.signals[index];
+          document.getElementById(`bar-${name}`).style.width = `${Math.round(data.signals[index] / 8 * 100)}%`;
+        });
+      }
+      const badge = document.getElementById('area-status'); badge.className = `status ${data.tone}`; badge.innerHTML = `<i class="dot"></i> ${data.badge}`;
+      document.getElementById('confirm-state').className = 'confirm-state';
+      showScreen('area');
+    }
+    document.querySelectorAll('[data-open-area]').forEach(button => button.addEventListener('click', () => openArea(button.dataset.openArea)));
+    document.querySelectorAll('.plot button[data-area]').forEach(button => button.addEventListener('click', () => openArea(button.dataset.area)));
+    document.querySelectorAll('[data-locator-area]').forEach(button => button.addEventListener('click', () => openArea(button.dataset.locatorArea)));
+    document.querySelectorAll('[data-open-review]').forEach(button => button.addEventListener('click', () => {
+      const photo = button.dataset.photo || photoTiles[0]?.dataset.photo;
+      if (photo) reviewPhoto.src = photo;
+      document.getElementById('review-backdrop').classList.add('open');
+    }));
+    function closeReview() { document.getElementById('review-backdrop').classList.remove('open'); }
+    document.getElementById('close-review').addEventListener('click', closeReview);
+    document.getElementById('review-backdrop').addEventListener('click', event => { if (event.target.id === 'review-backdrop') closeReview(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeReview(); });
+
+    document.querySelectorAll('[data-role]').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('[data-role]').forEach(item => item.classList.toggle('active', item === button));
+      const staff = button.dataset.role === 'staff';
+      showScreen(staff ? 'capture' : 'overview');
+      showToast(staff ? 'Previewing the field-staff photo inbox' : 'Previewing the farm-manager dashboard');
+    }));
+
+    const manualInput = document.getElementById('manual-upload-input');
+    document.getElementById('add-photos').addEventListener('click', () => manualInput.click());
+    document.getElementById('open-drive').addEventListener('click', () => showToast('In production, this opens the farm’s shared Drive Inbox.'));
+    let pendingUploads = [];
+    let uploadInterval = null;
+    function queueManualFiles(files, isRetry = false) {
+      if (files && files.length) pendingUploads = [...files];
+      if (!pendingUploads.length) return;
+      if (uploadInterval) clearInterval(uploadInterval);
+      const progress = document.getElementById('upload-progress');
+      const fill = document.getElementById('progress-fill');
+      const percent = document.getElementById('progress-percent');
+      const label = document.getElementById('progress-label');
+      const retryButton = document.getElementById('retry-upload');
+      progress.hidden = false; fill.style.width = '0%'; percent.textContent = '0%';
+      label.textContent = isRetry ? 'Retrying local demo transfer…' : `Adding ${pendingUploads.length} file${pendingUploads.length > 1 ? 's' : ''} to the queue…`;
+      retryButton.hidden = true;
+      if (!navigator.onLine) {
+        fill.style.width = '38%'; fill.style.background = 'var(--red)'; percent.textContent = 'Paused';
+        label.textContent = 'Connection lost · selected files stay on this device';
+        retryButton.hidden = false; retryButton.textContent = 'Retry';
+        showToast('No connection. Selected files stay here until you retry.');
+        return;
+      }
+      fill.style.background = 'var(--green-2)';
+      let progressValue = 0;
+      uploadInterval = setInterval(() => {
+        progressValue = Math.min(100, progressValue + 20);
+        fill.style.width = `${progressValue}%`; percent.textContent = `${progressValue}%`;
+        if (progressValue >= 100) {
+          clearInterval(uploadInterval); uploadInterval = null;
+          label.textContent = 'Added to the local demo queue · no upload sent';
+          retryButton.hidden = true;
+          completeManualFiles(pendingUploads);
+          pendingUploads = [];
+        }
+      }, 140);
+    }
+    function completeManualFiles(files) {
+      const list = document.getElementById('queue-list');
+      files.forEach(file => {
+        const row = document.createElement('div'); row.className = 'queue-row';
+        const meta = document.createElement('span'); meta.className = 'queue-meta';
+        const strong = document.createElement('strong'); strong.textContent = file.name;
+        const small = document.createElement('small'); small.textContent = 'Selected from this computer · demo only';
+        meta.append(strong, small); const badge = document.createElement('span'); badge.className = 'status gray queue-status'; badge.textContent = 'Queued';
+        row.append(meta, badge); list.prepend(row);
+      });
+      document.getElementById('waiting-count').textContent = `${Number(document.getElementById('waiting-count').textContent.match(/\d+/)?.[0] || 0) + files.length} photos`;
+      showToast(`${files.length} file${files.length > 1 ? 's' : ''} added to the demo queue. Nothing was uploaded.`);
+    }
+    manualInput.addEventListener('change', () => queueManualFiles(manualInput.files));
+    document.getElementById('retry-upload').addEventListener('click', () => {
+      queueManualFiles([], true);
+    });
+    document.getElementById('retry-failed').addEventListener('click', () => {
+      const failedRow = document.getElementById('failed-row');
+      failedRow.querySelector('.queue-meta small').textContent = 'Retry queued · 10:18 AM';
+      const badge = failedRow.querySelector('.queue-status'); badge.className = 'status gray queue-status'; badge.textContent = 'Queued';
+      document.getElementById('failed-count').textContent = '0 photos';
+      document.getElementById('failed-count').style.color = 'var(--green)';
+      const retry = document.getElementById('retry-failed'); retry.disabled = true; retry.textContent = 'Retry queued';
+      showToast('Failed file queued for retry in this demo.');
+    });
+    document.getElementById('start-inspection').addEventListener('click', () => {
+      const button = document.getElementById('start-inspection'); button.textContent = 'Inspection started'; button.classList.remove('primary'); button.classList.add('soft');
+      showToast(`Area ${selectedArea} inspection started in this demo.`);
+    });
+    document.getElementById('mark-confirmed').addEventListener('click', () => {
+      const state = document.getElementById('confirm-state'); state.className = 'confirm-state visible confirmed'; state.textContent = `Field confirmation saved for Area ${selectedArea} in this demo.`;
+      showToast('Field-confirmed status recorded locally.');
+    });
+    document.getElementById('needs-evidence').addEventListener('click', () => {
+      const state = document.getElementById('confirm-state'); state.className = 'confirm-state visible evidence'; state.textContent = 'More evidence requested. Add a close-up photo after the field visit.';
+      showToast('Area marked as needing more evidence.');
+    });
+    const followupInput = document.getElementById('followup-input');
+    document.getElementById('upload-followup').addEventListener('click', () => followupInput.click());
+    followupInput.addEventListener('change', () => {
+      const count = followupInput.files.length;
+      if (count) showToast(`${count} follow-up photo${count > 1 ? 's' : ''} selected for this demo.`);
+    });
+    document.querySelectorAll('[data-review-choice]').forEach(button => button.addEventListener('click', () => {
+      const choice = button.dataset.reviewChoice;
+      const messages = { confirmed: 'Field confirmation recorded locally.', 'not-confirmed': 'Marked as not confirmed locally.', 'more-photo': 'Follow-up photo requested.' };
+      if (choice === 'confirmed') document.getElementById('confirmed-total').textContent = String(Number(document.getElementById('confirmed-total').textContent) + 1);
+      closeReview(); showToast(messages[choice]);
+    }));
+    document.getElementById('export-report').addEventListener('click', () => {
+      const report = 'Sample Cacao Farm — Weekly Farm Health Report\nWeek of 26 Oct 2026\n\n367 photos analyzed\n3 priority areas\nArea B: 8 / 24 photos flagged (33%)\n12 follow-up photos pending\n\nAI signals are for inspection prioritization, not disease confirmation.';
+      const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([report], { type: 'text/plain' })); link.download = 'sample-farm-weekly-health-summary.txt'; link.click(); URL.revokeObjectURL(link.href);
+      showToast('Demo summary downloaded.');
+    });
+  </script>
+</body>
+</html>
