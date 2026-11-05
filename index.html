@@ -209,6 +209,67 @@
     .confirm-state.visible { display: block; }
     .confirm-state.confirmed { background: var(--mint); color: #226548; }
     .confirm-state.evidence { background: var(--amber-bg); color: #80550e; }
+    .tree-panel { padding: 18px; margin-bottom: 16px; }
+    .tree-list { display: grid; gap: 8px; }
+    .tree-row { width: 100%; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-align: left; color: var(--ink); transition: .15s; }
+    .tree-row:hover, .tree-row:focus-visible { border-color: #b4ceba; box-shadow: 0 5px 13px #173c2d10; transform: translateY(-1px); outline: none; }
+    .tree-marker { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: #f0f4ef; color: var(--green); font-size: 12px; font-weight: 800; }
+    .tree-row.priority .tree-marker { background: var(--red-bg); color: var(--red); }
+    .tree-row strong { display: block; font-size: 11px; }
+    .tree-row small { display: block; color: var(--muted); margin-top: 3px; font-size: 9px; }
+    .tree-row .tree-action { color: var(--green); font-size: 10px; font-weight: 800; white-space: nowrap; }
+
+    /* Tree record */
+    .record-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,.9fr); gap: 16px; align-items: start; }
+    .record-photo-card, .record-evidence, .record-actions, .record-history { padding: 19px; }
+    .record-photo-wrap { overflow: hidden; border-radius: 12px; background: #e8eee7; }
+    .record-photo-wrap img { display: block; width: 100%; height: 300px; object-fit: cover; }
+    .record-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--muted); font-size: 9px; }
+    .record-stack { display: grid; gap: 16px; }
+    .record-signal { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px; background: var(--red-bg); border: 1px solid #f0d0ca; border-radius: 10px; }
+    .record-signal.green { background: var(--mint); border-color: #d6e9da; }
+    .record-signal.green small, .record-signal.green .signal-score { color: #226548; }
+    .record-signal.amber { background: var(--amber-bg); border-color: #f2dfb7; }
+    .record-signal.amber small, .record-signal.amber .signal-score { color: #86570f; }
+    .record-signal strong { display: block; font-size: 13px; }
+    .record-signal small { color: #9d3c31; font-size: 9px; }
+    .record-signal .signal-score { color: #9d3c31; font-size: 20px; font-weight: 800; }
+    .record-kv-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 9px; margin-top: 13px; }
+    .record-kv { padding: 10px; border-radius: 9px; background: #f7f9f5; }
+    .record-kv span { display: block; color: var(--muted); font-size: 9px; }
+    .record-kv strong { display: block; margin-top: 4px; font-size: 11px; }
+    .field-log { display: grid; gap: 9px; margin-top: 13px; }
+    .field-log label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; }
+    .field-log input, .field-log select { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; background: #fff; color: var(--ink); font-size: 10px; }
+    .field-log[hidden] { display: none; }
+    .record-history-list { display: grid; gap: 0; margin-top: 12px; }
+    .history-item { display: grid; grid-template-columns: 11px 1fr; gap: 10px; position: relative; padding: 0 0 15px; font-size: 10px; }
+    .history-item:last-child { padding-bottom: 0; }
+    .history-item::before { content: ""; width: 8px; height: 8px; margin-top: 3px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--mint); z-index: 1; }
+    .history-item:not(:last-child)::after { content: ""; position: absolute; left: 3px; top: 12px; bottom: 0; width: 2px; background: #dceade; }
+    .history-item strong { display: block; font-size: 10px; }
+    .history-item small { display: block; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+    /* Outcome view */
+    .outcome-banner { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 20px; margin-bottom: 16px; border-radius: 15px; background: linear-gradient(135deg,#173c2d,#286b4c); color: white; }
+    .outcome-banner small { color: #bfd7c3; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .outcome-banner h2 { margin: 5px 0 0; font-size: 20px; letter-spacing: -.03em; }
+    .outcome-grid { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(280px,.8fr); gap: 16px; }
+    .comparison-card, .outcome-actions { padding: 19px; }
+    .comparison-columns { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; margin-top: 14px; }
+    .comparison-column { padding: 15px; border-radius: 11px; background: #f7f9f5; }
+    .comparison-column.after { background: var(--mint); }
+    .comparison-column h3 { margin: 0 0 10px; font-size: 12px; }
+    .comparison-column small { color: var(--muted); font-size: 9px; }
+    .comparison-value { display: block; margin: 8px 0 3px; font-size: 29px; letter-spacing: -.05em; font-weight: 800; }
+    .comparison-column.after .comparison-value { color: var(--green); }
+    .comparison-bar { height: 9px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: #e0e8df; }
+    .comparison-bar i { display: block; height: 100%; border-radius: inherit; background: var(--red); }
+    .comparison-column.after .comparison-bar i { background: var(--green-2); }
+    .outcome-note { color: var(--muted); font-size: 9px; line-height: 1.5; margin: 13px 0 0; }
+    .outcome-checklist { display: grid; gap: 9px; margin-top: 14px; }
+    .outcome-check { display: flex; gap: 9px; align-items: flex-start; padding: 10px; border-radius: 9px; background: #f7f9f5; font-size: 10px; line-height: 1.4; }
+    .outcome-check b { color: var(--green); }
 
     /* Weekly */
     .report-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px; background: #173c2d; color: white; border-radius: 15px; margin-bottom: 16px; }
@@ -260,7 +321,7 @@
     @media (max-width: 1050px) {
       .app { grid-template-columns: 205px minmax(0,1fr); }
       .content { padding:24px 22px 40px; } .topbar { padding:0 22px; }
-      .overview-layout, .area-grid, .week-grid { grid-template-columns: 1fr; }
+      .overview-layout, .area-grid, .week-grid, .record-grid, .outcome-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 760px) {
       .app { display:block; } .sidebar { padding:10px 12px; position:sticky; top:0; z-index:20; display:block; }
@@ -274,6 +335,8 @@
       .area-stat-grid { grid-template-columns:repeat(2,1fr); } .area-head { flex-direction:column; }
       .area-head-actions { justify-content:flex-start; } .farm-map { height:300px; }
       .area-locator { grid-template-columns:1fr; gap:10px; } .locator-map { height:132px; }
+      .tree-row { grid-template-columns:30px minmax(0,1fr); } .tree-row .tree-action { grid-column:2; }
+      .outcome-banner { align-items:flex-start; flex-direction:column; }
       .review-modal { grid-template-columns:1fr; } .review-photo { border-radius:16px 16px 0 0; min-height:250px; max-height:35vh; }
       .review-photo img { min-height:250px; } .review-details { padding:20px; }
       .report-banner { align-items:flex-start; flex-direction:column; }
@@ -282,7 +345,8 @@
       .demo-chip { font-size:8px; padding:6px 7px; } .avatar { width:29px; height:29px; }
       .capture-card, .capture-side { padding:16px; } .guide { grid-template-columns:1fr; }
       .farm-map { height:260px; } .plot { gap:2px; padding:3px; } .plot button { min-height:15px; }
-      .priority-card, .map-card, .signals, .recent, .trend-card, .actions-card { padding:14px; }
+      .priority-card, .map-card, .signals, .recent, .trend-card, .actions-card, .tree-panel, .record-photo-card, .record-evidence, .record-actions, .record-history, .comparison-card, .outcome-actions { padding:14px; }
+      .comparison-columns { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -296,6 +360,8 @@
         <button data-screen="capture"><span class="icon">▣</span>Photo inbox</button>
         <button data-screen="overview" class="active"><span class="icon">⌖</span>Farm overview</button>
         <button data-screen="area"><span class="icon">▦</span>Area detail</button>
+        <button data-screen="tree"><span class="icon">●</span>Tree record</button>
+        <button data-screen="outcome"><span class="icon">↗</span>Outcome view</button>
         <button data-screen="weekly"><span class="icon">▤</span>Weekly report</button>
       </nav>
       <div class="sidebar-spacer"></div>
@@ -433,6 +499,14 @@
             <article class="card area-stat"><span>Flagged rate</span><strong id="area-rate">33%</strong></article>
             <article class="card area-stat"><span>Last checked</span><strong style="font-size:16px">31 Oct 2026</strong></article>
           </div>
+          <section class="card tree-panel" aria-labelledby="tree-list-title">
+            <div class="panel-head"><div><h2 id="tree-list-title">Trees to check in Area B</h2><p class="section-note">The area signal narrows the search. Select a tree to review its evidence and field history.</p></div><span class="status red"><i class="dot"></i> 3 follow-ups</span></div>
+            <div class="tree-list">
+              <button class="tree-row priority" data-tree="B-037" type="button"><span class="tree-marker">037</span><span><strong>Tree B-037</strong><small>Black-pod-like · Field confirmation pending · 5 flagged photos</small></span><span class="tree-action">Open record →</span></button>
+              <button class="tree-row" data-tree="B-038" type="button"><span class="tree-marker">038</span><span><strong>Tree B-038</strong><small>Healthy signal · Last checked 31 Oct 2026</small></span><span class="tree-action">View record →</span></button>
+              <button class="tree-row" data-tree="B-039" type="button"><span class="tree-marker">039</span><span><strong>Tree B-039</strong><small>Pest-like · Follow-up photo recommended · 2 flagged photos</small></span><span class="tree-action">View record →</span></button>
+            </div>
+          </section>
           <div class="area-grid">
             <section class="card signals">
               <div class="panel-head"><h2>Possible signals</h2><span class="status gray">AI screening only</span></div>
@@ -465,7 +539,78 @@
           </div>
         </section>
 
-        <!-- Screen 4: weekly report -->
+        <!-- Screen 4: tree record -->
+        <section class="screen" id="screen-tree" aria-labelledby="tree-record-title">
+          <button class="back-link" data-screen="area">← Back to Area B</button>
+          <div class="page-head area-head"><div><div class="eyebrow">Field record · Tree-level follow-up</div><h1 id="tree-record-title">Tree B-037</h1><p class="subtitle" id="tree-record-description">A single tree record connects the screening signal to the field decision.</p></div><div class="area-head-actions"><span class="status red" id="tree-record-status"><i class="dot"></i> Field confirmation pending</span><button class="btn primary" id="tree-confirmed" type="button">Confirm in field</button></div></div>
+          <div class="record-grid">
+            <section class="card record-photo-card">
+              <div class="panel-head"><h2>Evidence photo</h2><span class="status gray">Illustrative sample</span></div>
+              <div class="record-photo-wrap"><img id="tree-photo" src="assets/pod-dark-green.png" alt="Illustrative cacao pod photo for Tree B-037"></div>
+              <div class="record-caption"><span id="tree-photo-caption">IMG_1041.jpg · Area B</span><span>Capture 7 / 10</span></div>
+              <p class="small-print">The photo and result shown here are illustrative demo data. A field worker should confirm the observation before treatment.</p>
+            </section>
+            <div class="record-stack">
+              <section class="card record-evidence">
+                <div class="panel-head"><h2>Screening evidence</h2><span class="status amber">Review recommended</span></div>
+                <div class="record-signal" id="tree-signal-card"><div><strong id="tree-signal-name">Black-pod-like</strong><small id="tree-signal-note">Possible signal · human confirmation required</small></div><span class="signal-score" id="tree-signal-score">0.78</span></div>
+                <div class="record-kv-grid">
+                  <div class="record-kv"><span>Farm area</span><strong id="tree-area">Area B</strong></div>
+                  <div class="record-kv"><span>Photo order</span><strong id="tree-capture">7 / 10</strong></div>
+                  <div class="record-kv"><span>Tree linkage</span><strong id="tree-linkage">0.82 · candidate</strong></div>
+                  <div class="record-kv"><span>Last checked</span><strong id="tree-last-checked">31 Oct 2026</strong></div>
+                </div>
+              </section>
+              <section class="card record-actions">
+                <div class="panel-head"><h2>Field action</h2><span class="status gray" id="tree-field-state">No action recorded</span></div>
+                <p class="section-note">Record what the team did so the next photo can be compared with this visit.</p>
+                <button class="btn soft" id="open-log-form" type="button">＋ Record field action</button>
+                <div class="field-log" id="field-log" hidden>
+                  <label>Action<select id="tree-action-select"><option>Inspect and remove affected pod</option><option>Pruning / sanitation</option><option>Bagging</option><option>Fertilizer or soil treatment</option></select></label>
+                  <label>Next check date<input id="tree-next-check" type="date" value="2026-11-19"></label>
+                  <button class="btn primary" id="save-field-action" type="button">Save field action</button>
+                </div>
+                <div class="confirm-state" id="tree-record-feedback"></div>
+              </section>
+              <section class="card record-history">
+                <div class="panel-head"><h2>Tree history</h2><button class="btn" data-screen="outcome" type="button">Compare outcome →</button></div>
+                <div class="record-history-list">
+                  <div class="history-item"><span><strong>31 Oct 2026 · Screening signal</strong><small>Black-pod-like pattern detected in 5 of 10 linked photos.</small></span></div>
+                  <div class="history-item"><span><strong>05 Nov 2026 · Field visit planned</strong><small>Start the next field check here.</small></span></div>
+                  <div class="history-item"><span><strong>19 Nov 2026 · Follow-up due</strong><small>Take a close-up photo and compare the result.</small></span></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <!-- Screen 5: outcome view -->
+        <section class="screen" id="screen-outcome" aria-labelledby="outcome-title">
+          <div class="page-head"><div><div class="eyebrow">Farm manager · Outcome tracking</div><h1 id="outcome-title">Outcome View</h1><p class="subtitle">Compare the next visit with the previous one to see whether the field action helped.</p></div><div class="date-label">Tree B-037 · Area B</div></div>
+          <div class="outcome-banner"><div><small>Illustrative follow-up comparison</small><h2>Is the signal improving after the field action?</h2></div><button class="btn" data-screen="tree" type="button">← Open tree record</button></div>
+          <div class="outcome-grid">
+            <section class="card comparison-card">
+              <div class="panel-head"><h2>Before and after</h2><span class="status green">Follow-up cycle</span></div>
+              <div class="comparison-columns">
+                <div class="comparison-column"><h3>Before field action</h3><small>31 Oct 2026 · 10 linked photos</small><span class="comparison-value">5 / 10</span><small>photos flagged for review</small><div class="comparison-bar"><i style="width:50%"></i></div></div>
+                <div class="comparison-column after"><h3>After follow-up</h3><small>19 Nov 2026 · 10 linked photos</small><span class="comparison-value">1 / 10</span><small>photos flagged for review</small><div class="comparison-bar"><i style="width:10%"></i></div></div>
+              </div>
+              <p class="outcome-note">A lower flagged share is a positive screening signal, not proof of disease resolution. Confirm the tree condition in person and keep the denominator visible.</p>
+            </section>
+            <aside class="card outcome-actions">
+              <div class="panel-head"><h2>What changed?</h2><span class="status amber">Review with staff</span></div>
+              <div class="outcome-checklist">
+                <div class="outcome-check"><b>✓</b><span><strong>Field action recorded</strong><br>Inspect and remove affected pod</span></div>
+                <div class="outcome-check"><b>✓</b><span><strong>Next photo scheduled</strong><br>19 Nov 2026</span></div>
+                <div class="outcome-check"><b>→</b><span><strong>Next decision</strong><br>Confirm the tree and recheck nearby trees</span></div>
+              </div>
+              <button class="btn primary" style="width:100%;margin-top:14px" data-screen="weekly" type="button">Open weekly report →</button>
+            </aside>
+          </div>
+          <p class="small-print">Outcome data is illustrative demo data. Replace it with confirmed field observations and repeat photos in a live deployment.</p>
+        </section>
+
+        <!-- Screen 6: weekly report -->
         <section class="screen" id="screen-weekly" aria-labelledby="weekly-title">
           <div class="page-head"><div><div class="eyebrow">Farm manager · Weekly action summary</div><h1 id="weekly-title">Weekly Farm Health Report</h1><p class="subtitle">A short list of places to revisit, with enough evidence to plan the week.</p></div><div class="date-label">Week of 26 Oct 2026</div></div>
           <div class="report-banner"><div><small>SAMPLE CACAO FARM · WEEK 44</small><h2>3 areas may need a closer look.</h2></div><button class="btn" id="export-report">↓ &nbsp; Export summary</button></div>
@@ -511,13 +656,14 @@
       <button class="modal-close" id="close-review" aria-label="Close photo review">×</button>
       <div class="review-photo"><img class="field-photo" id="review-photo" alt="Original cacao pod photo"></div>
       <div class="review-details">
-        <span class="status gray"><i class="dot"></i> Illustrative sample · not analyzed</span>
+        <span class="status amber"><i class="dot"></i> Review recommended · illustrative output</span>
         <h2 id="review-title">Photo Review</h2>
-        <p>This generated sample image has not been analyzed by a CacaoAI model. Real model output will appear here after inference.</p>
+        <p>Review the screening signal, then confirm what is actually present in the field. This demo result is illustrative, not a live inference.</p>
         <div class="review-kv"><span>Farm area</span><strong>Area B · Sample Cacao Farm</strong></div>
-        <div class="review-kv"><span>Image type</span><strong>Generated illustration</strong></div>
-        <div class="review-kv"><span>Pod detection</span><strong>Not evaluated</strong></div>
-        <div class="review-kv"><span>Model result</span><strong>Not available · no inference run</strong></div>
+        <div class="review-kv"><span>Linked tree</span><strong>Tree B-037 · candidate</strong></div>
+        <div class="review-kv"><span>Screening signal</span><strong>Black-pod-like · 0.78</strong></div>
+        <div class="review-kv"><span>Capture context</span><strong>GPS available · photo 7 / 10</strong></div>
+        <div class="review-kv"><span>Next action</span><strong>Start the field check here</strong></div>
         <div class="review-actions">
           <button class="btn soft" data-review-choice="confirmed">✓ &nbsp; Confirmed in field</button>
           <button class="btn" data-review-choice="not-confirmed">○ &nbsp; Not confirmed</button>
@@ -535,7 +681,7 @@
     photoTiles.forEach(tile => { tile.querySelector('.field-photo').src = tile.dataset.photo; });
     const reviewPhoto = document.getElementById('review-photo');
     reviewPhoto.src = photoTiles[0]?.dataset.photo || '';
-    const names = { capture: 'Photo inbox', overview: 'Farm overview', area: 'Area detail', weekly: 'Weekly report' };
+    const names = { capture: 'Photo inbox', overview: 'Farm overview', area: 'Area detail', tree: 'Tree record', outcome: 'Outcome view', weekly: 'Weekly report' };
     const screens = [...document.querySelectorAll('.screen')];
     const navButtons = [...document.querySelectorAll('[data-screen]')];
     let selectedArea = 'B';
@@ -554,6 +700,32 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     navButtons.forEach(button => button.addEventListener('click', () => showScreen(button.dataset.screen)));
+    function openTreeRecord(key = 'B-037') {
+      const data = {
+        'B-037': { title: 'Tree B-037', image: 'assets/pod-dark-green.png', signal: 'Black-pod-like', score: '0.78', note: 'Possible signal · human confirmation required', area: 'Area B', capture: '7 / 10', linkage: '0.82 · candidate', date: '31 Oct 2026', caption: 'IMG_1041.jpg · Area B', status: 'Field confirmation pending', tone: 'red' },
+        'B-038': { title: 'Tree B-038', image: 'assets/pod-green-a.png', signal: 'No immediate warning', score: '0.12', note: 'No strong screening signal in the sample', area: 'Area B', capture: '8 / 10', linkage: '0.76 · candidate', date: '31 Oct 2026', caption: 'IMG_1042.jpg · Area B', status: 'No immediate warning', tone: 'green' },
+        'B-039': { title: 'Tree B-039', image: 'assets/pod-orange.png', signal: 'Pest-like', score: '0.64', note: 'Possible signal · field follow-up recommended', area: 'Area B', capture: '9 / 10', linkage: '0.69 · candidate', date: '31 Oct 2026', caption: 'IMG_1043.jpg · Area B', status: 'Follow-up recommended', tone: 'amber' }
+      }[key] || null;
+      if (!data) return;
+      document.getElementById('tree-record-title').textContent = data.title;
+      document.getElementById('tree-record-status').className = `status ${data.tone}`;
+      document.getElementById('tree-record-status').innerHTML = `<i class="dot"></i> ${data.status}`;
+      document.getElementById('tree-signal-card').className = `record-signal ${data.tone}`;
+      document.getElementById('tree-photo').src = data.image;
+      document.getElementById('tree-photo').alt = `Illustrative cacao pod photo for ${data.title}`;
+      document.getElementById('tree-photo-caption').textContent = data.caption;
+      document.getElementById('tree-signal-name').textContent = data.signal;
+      document.getElementById('tree-signal-note').textContent = data.note;
+      document.getElementById('tree-signal-score').textContent = data.score;
+      document.getElementById('tree-area').textContent = data.area;
+      document.getElementById('tree-capture').textContent = data.capture;
+      document.getElementById('tree-linkage').textContent = data.linkage;
+      document.getElementById('tree-last-checked').textContent = data.date;
+      document.getElementById('tree-record-feedback').className = 'confirm-state';
+      document.getElementById('field-log').hidden = true;
+      showScreen('tree');
+    }
+    document.querySelectorAll('[data-tree]').forEach(button => button.addEventListener('click', () => openTreeRecord(button.dataset.tree)));
     function openArea(key = 'B') {
       selectedArea = key;
       const data = {
@@ -678,6 +850,24 @@
     document.getElementById('start-inspection').addEventListener('click', () => {
       const button = document.getElementById('start-inspection'); button.textContent = 'Inspection started'; button.classList.remove('primary'); button.classList.add('soft');
       showToast(`Area ${selectedArea} inspection started in this demo.`);
+    });
+    document.getElementById('open-log-form').addEventListener('click', () => {
+      const form = document.getElementById('field-log'); form.hidden = !form.hidden;
+      document.getElementById('open-log-form').textContent = form.hidden ? '＋ Record field action' : '× Close action form';
+    });
+    document.getElementById('save-field-action').addEventListener('click', () => {
+      const action = document.getElementById('tree-action-select').value;
+      const date = document.getElementById('tree-next-check').value || 'the next visit';
+      const state = document.getElementById('tree-field-state'); state.className = 'status green'; state.innerHTML = '<i class="dot"></i> Action recorded';
+      const feedback = document.getElementById('tree-record-feedback'); feedback.className = 'confirm-state visible confirmed'; feedback.textContent = `${action} recorded. Next check: ${date}.`;
+      document.getElementById('field-log').hidden = true;
+      document.getElementById('open-log-form').textContent = '＋ Record another action';
+      showToast('Field action saved locally in this demo.');
+    });
+    document.getElementById('tree-confirmed').addEventListener('click', () => {
+      const status = document.getElementById('tree-record-status'); status.className = 'status green'; status.innerHTML = '<i class="dot"></i> Field-confirmed';
+      const feedback = document.getElementById('tree-record-feedback'); feedback.className = 'confirm-state visible confirmed'; feedback.textContent = 'Field confirmation saved locally for this demo.';
+      showToast('Tree marked as field-confirmed.');
     });
     document.getElementById('mark-confirmed').addEventListener('click', () => {
       const state = document.getElementById('confirm-state'); state.className = 'confirm-state visible confirmed'; state.textContent = `Field confirmation saved for Area ${selectedArea} in this demo.`;
