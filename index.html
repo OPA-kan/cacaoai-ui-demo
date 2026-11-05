@@ -149,6 +149,35 @@
     .map-controls { position: absolute; top: 12px; right: 12px; display: grid; gap: 5px; }
     .map-controls button { width: 29px; height: 29px; border: 1px solid #d5ded3; border-radius: 7px; background: white; color: #405b48; font-weight: 750; }
     .map-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; color: var(--muted); font-size: 9px; }
+    .map-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .map-toggle { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: #f7f9f5; }
+    .map-toggle button { border: 0; border-radius: 6px; padding: 7px 9px; background: transparent; color: var(--muted); font-size: 9px; font-weight: 750; }
+    .map-toggle button.active { background: white; color: var(--green); box-shadow: 0 2px 6px #173c2d12; }
+    .map-mode-note { color: var(--muted); font-size: 9px; }
+    .farm-map.mode-photos .plot { opacity: .24; }
+    .farm-map.mode-trees .plot { opacity: .42; }
+    .photo-marker, .tree-map-marker { position: absolute; z-index: 5; width: 27px; height: 27px; display: grid; place-items: center; border: 2px solid white; border-radius: 50%; box-shadow: 0 3px 9px #173c2d35; color: white; font-size: 11px; font-weight: 800; transition: .15s; }
+    .photo-marker { background: var(--red); }
+    .photo-marker.amber { background: var(--amber); }
+    .photo-marker.green { background: var(--green-2); }
+    .photo-marker.active, .photo-marker:hover, .tree-map-marker:hover { outline: 3px solid rgba(255,255,255,.85); transform: scale(1.18); }
+    .tree-map-marker { background: #315f8a; width: 24px; height: 24px; font-size: 9px; }
+    .map-marker-1041 { left: 59%; top: 28%; }
+    .map-marker-1042 { left: 68%; top: 35%; }
+    .map-marker-1043 { left: 54%; top: 41%; }
+    .tree-marker-037 { left: 61%; top: 31%; }
+    .tree-marker-038 { left: 72%; top: 36%; }
+    .tree-marker-039 { left: 56%; top: 45%; }
+    .farm-map.mode-areas .tree-map-marker { opacity: .4; }
+    .farm-map.mode-areas .photo-marker { opacity: .94; }
+    .farm-map.mode-photos .tree-map-marker { opacity: .18; }
+    .farm-map.mode-trees .photo-marker { opacity: .18; }
+    .photo-inspector { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; align-items: center; margin-top: 11px; padding: 10px; border: 1px solid #dceade; border-radius: 10px; background: #f4f9f2; }
+    .photo-inspector[hidden] { display: none; }
+    .photo-inspector img { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; }
+    .photo-inspector strong { display: block; font-size: 10px; }
+    .photo-inspector small { display: block; color: var(--muted); margin-top: 3px; font-size: 9px; line-height: 1.4; }
+    .photo-inspector .btn { padding: 7px 9px; white-space: nowrap; }
     .priority-card { padding: 17px; }
     .priority-list { display: grid; gap: 8px; }
     .priority-row { width: 100%; background: white; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; grid-template-columns: 25px 1fr auto; gap: 8px; align-items: center; transition: .15s; }
@@ -184,6 +213,18 @@
     .locator-kpis span { border-radius:7px; padding:5px 7px; background:#f3f6f1; color:#536158; font-size:9px; }
     .locator-kpis strong { color:var(--ink); }
     .locator-note { margin:7px 0 0 !important; color:#87938a !important; font-size:8px !important; }
+    .location-card { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 9px; align-items: center; margin-top: 11px; padding: 9px; border: 1px solid #dceade; border-radius: 9px; background: #f4f9f2; }
+    .location-card[hidden], .locator-photo-marker[hidden] { display: none; }
+    .location-card img { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; }
+    .location-card strong { display: block; font-size: 10px; }
+    .location-card small { display: block; color: var(--muted); margin-top: 3px; font-size: 8px; line-height: 1.4; }
+    .location-card .btn { margin-top: 6px; padding: 6px 8px; font-size: 9px; }
+    .locator-photo-marker { position:absolute; z-index:4; width:21px; height:21px; padding:0; border:2px solid white; border-radius:50%; background:var(--red); color:white; font-size:9px; font-weight:800; box-shadow:0 2px 6px #173c2d35; }
+    .locator-photo-marker.amber { background: var(--amber); }
+    .locator-photo-marker.active { outline: 2px solid white; box-shadow: 0 0 0 3px var(--red),0 3px 8px #173c2d35; }
+    .locator-photo-1041 { left:63%; top:27%; }
+    .locator-photo-1042 { left:75%; top:39%; }
+    .locator-photo-1043 { left:56%; top:51%; }
     .area-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 11px; margin: 20px 0 16px; }
     .area-stat { padding: 14px 16px; }
     .area-stat span { color: var(--muted); font-size: 10px; }
@@ -434,8 +475,9 @@
           </div>
           <div class="overview-layout">
             <section class="card map-card">
-              <div class="panel-head"><h2>Sample farm · Area-level signals</h2><div class="map-legend"><span><i class="legend-dot" style="background:#4d9b6d"></i>No immediate warning</span><span><i class="legend-dot" style="background:#e4b747"></i>Follow-up</span><span><i class="legend-dot" style="background:#d66e57"></i>Priority</span></div></div>
-              <div class="farm-map" aria-label="Illustrative farm block heatmap">
+              <div class="panel-head"><h2>Sample farm · Field location view</h2><div class="map-legend"><span><i class="legend-dot" style="background:#4d9b6d"></i>No immediate warning</span><span><i class="legend-dot" style="background:#e4b747"></i>Follow-up</span><span><i class="legend-dot" style="background:#d66e57"></i>Priority</span></div></div>
+              <div class="map-tools"><div class="map-toggle" role="group" aria-label="Map layer"><button class="active" aria-pressed="true" data-map-mode="areas" type="button">Area signals</button><button aria-pressed="false" data-map-mode="photos" type="button">Photos</button><button aria-pressed="false" data-map-mode="trees" type="button">Trees</button></div><span class="map-mode-note" id="map-mode-note">Photo pins show sample capture locations.</span></div>
+              <div class="farm-map mode-areas" id="overview-map" aria-label="Illustrative farm map with area signals and photo locations">
                 <div class="map-water"></div><div class="map-road"></div>
                 <div class="plot plot-a" aria-label="Area A, 2 flagged out of 21"><span class="plot-label">AREA A</span>
                   <button class="green-cell" data-area="A" aria-label="Area A grid cell"></button><button class="green-cell" data-area="A"></button><button class="amber-cell" data-area="A"></button><button class="green-cell" data-area="A"></button>
@@ -455,9 +497,20 @@
                   <button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="amber-cell" data-area="D"></button>
                   <button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button><button class="green-cell" data-area="D"></button>
                 </div>
+                <button class="photo-marker map-marker-1041 active" data-photo-id="1041" type="button" aria-label="Photo IMG_1041, Area B, Tree B-037 candidate">📷</button>
+                <button class="photo-marker amber map-marker-1042" data-photo-id="1042" type="button" aria-label="Photo IMG_1042, Area B, Tree B-038 candidate">📷</button>
+                <button class="photo-marker amber map-marker-1043" data-photo-id="1043" type="button" aria-label="Photo IMG_1043, Area B, Tree B-039 candidate">📷</button>
+                <button class="tree-map-marker tree-marker-037" data-tree="B-037" type="button" aria-label="Tree B-037 candidate">037</button>
+                <button class="tree-map-marker tree-marker-038" data-tree="B-038" type="button" aria-label="Tree B-038 candidate">038</button>
+                <button class="tree-map-marker tree-marker-039" data-tree="B-039" type="button" aria-label="Tree B-039 candidate">039</button>
                 <div class="map-controls"><button aria-label="Zoom in" type="button">+</button><button aria-label="Zoom out" type="button">−</button></div>
               </div>
-              <div class="map-caption"><span>Grid shading is an AI screening signal, not a confirmed disease map.</span><span>Illustrative layout · GPS coverage varies</span></div>
+              <div class="map-caption"><span>Signals and photo locations are for field prioritization, not disease confirmation.</span><span>Sample pins are illustrative</span></div>
+              <div class="photo-inspector" id="overview-photo-inspector">
+                <img id="overview-photo-thumb" src="assets/pod-dark-green.png" alt="Selected cacao pod photo">
+                <div><strong id="overview-photo-name">IMG_1041.jpg · Area B</strong><small id="overview-photo-meta">Tree B-037 · candidate · Black-pod-like · Capture 7 / 10</small></div>
+                <button class="btn" id="overview-open-photo" type="button">Open photo review →</button>
+              </div>
             </section>
             <aside class="card priority-card">
               <div class="panel-head"><h2>Priority areas</h2><span class="status red"><i class="dot"></i> Inspect first</span></div>
@@ -483,12 +536,16 @@
               <button class="locator-plot loc-b selected" data-locator-area="B" type="button" aria-label="Currently viewing Area B details">AREA B <span class="locator-selected-tag">VIEWING</span></button>
               <button class="locator-plot loc-c" data-locator-area="C" type="button" aria-label="Show Area C details">AREA C</button>
               <button class="locator-plot loc-d" data-locator-area="D" type="button" aria-label="Show Area D details">AREA D</button>
+              <button class="locator-photo-marker locator-photo-1041 active" data-photo-id="1041" type="button" aria-label="Photo IMG_1041 at Tree B-037">📷</button>
+              <button class="locator-photo-marker locator-photo-1042 amber" data-photo-id="1042" type="button" aria-label="Photo IMG_1042 at Tree B-038">📷</button>
+              <button class="locator-photo-marker locator-photo-1043 amber" data-photo-id="1043" type="button" aria-label="Photo IMG_1043 at Tree B-039">📷</button>
             </div>
             <div class="locator-details">
               <div class="eyebrow">Selected area on farm map</div>
               <h2 id="locator-area-name">Area B</h2>
               <p id="locator-copy">The highlighted block is the location for the details and photos shown below. Tap another block to switch areas.</p>
               <div class="locator-kpis"><span><strong id="locator-photos">24</strong> photos</span><span><strong id="locator-flagged">8</strong> flagged for review</span></div>
+              <div class="location-card" id="area-photo-location-card"><img id="area-photo-thumb" src="assets/pod-dark-green.png" alt="Selected cacao pod photo"><div><strong id="area-photo-name">IMG_1041.jpg · Tree B-037 candidate</strong><small id="area-photo-meta">Location link · sample data · Black-pod-like · photo 7 / 10</small><button class="btn" id="area-open-photo" type="button">Open photo review →</button></div></div>
               <button class="btn" data-screen="overview" type="button">View full farm map →</button>
               <p class="locator-note">Illustrative block layout; replace with the farm’s verified block map.</p>
             </div>
@@ -527,12 +584,12 @@
               <input id="followup-input" type="file" accept="image/*" multiple hidden>
             </section>
             <aside class="card recent">
-              <div class="panel-head"><h2>Recent photos</h2><button class="btn" style="padding:7px 9px" data-open-review>View all</button></div>
+              <div class="panel-head"><h2>Recent photos</h2><button class="btn" style="padding:7px 9px" data-open-review>Open photo review</button></div>
               <div class="recent-grid">
-                <button class="photo-tile" data-open-review data-photo="assets/pod-green-a.png"><img class="field-photo" alt="Illustrative close-up of a green cacao pod"><span><b>Sample image 01</b>Generated illustration · not analyzed</span></button>
-                <button class="photo-tile" data-open-review data-photo="assets/pod-bagged-a.png"><img class="field-photo" alt="Illustrative close-up of a cacao pod inside a clear protective bag"><span><b>Sample image 02</b>Generated illustration · not analyzed</span></button>
-                <button class="photo-tile" data-open-review data-photo="assets/pod-dark-green.png"><img class="field-photo" alt="Illustrative close-up of a dark green cacao pod"><span><b>Sample image 03</b>Generated illustration · not analyzed</span></button>
-                <button class="photo-tile" data-open-review data-photo="assets/pod-bagged-b.png"><img class="field-photo" alt="Illustrative close-up of a cacao pod inside a clear protective bag"><span><b>Sample image 04</b>Generated illustration · not analyzed</span></button>
+                <button class="photo-tile" data-open-review data-photo-id="1041" data-photo="assets/pod-dark-green.png"><img class="field-photo" alt="Illustrative close-up of a dark green cacao pod"><span><b>IMG_1041.jpg</b>Tree B-037 candidate · Area B</span></button>
+                <button class="photo-tile" data-open-review data-photo-id="1042" data-photo="assets/pod-green-a.png"><img class="field-photo" alt="Illustrative close-up of a green cacao pod"><span><b>IMG_1042.jpg</b>Tree B-038 candidate · Area B</span></button>
+                <button class="photo-tile" data-open-review data-photo-id="1043" data-photo="assets/pod-orange.png"><img class="field-photo" alt="Illustrative close-up of an orange cacao pod"><span><b>IMG_1043.jpg</b>Tree B-039 candidate · Area B</span></button>
+                <button class="photo-tile" data-open-review data-photo-id="1044" data-photo="assets/pod-bagged-b.png"><img class="field-photo" alt="Illustrative close-up of a cacao pod inside a clear protective bag"><span><b>Follow-up sample</b>Location pending · review needed</span></button>
               </div>
               <p class="small-print">Images, photo labels, and example results are illustrative mock data, not farm records or model outputs. Use field confirmation to record what staff observed.</p>
             </aside>
@@ -656,14 +713,14 @@
       <button class="modal-close" id="close-review" aria-label="Close photo review">×</button>
       <div class="review-photo"><img class="field-photo" id="review-photo" alt="Original cacao pod photo"></div>
       <div class="review-details">
-        <span class="status amber"><i class="dot"></i> Review recommended · illustrative output</span>
-        <h2 id="review-title">Photo Review</h2>
+        <span class="status amber" id="review-status"><i class="dot"></i> Review recommended · illustrative output</span>
+        <h2 id="review-title">Photo Review · IMG_1041.jpg</h2>
         <p>Review the screening signal, then confirm what is actually present in the field. This demo result is illustrative, not a live inference.</p>
-        <div class="review-kv"><span>Farm area</span><strong>Area B · Sample Cacao Farm</strong></div>
-        <div class="review-kv"><span>Linked tree</span><strong>Tree B-037 · candidate</strong></div>
-        <div class="review-kv"><span>Screening signal</span><strong>Black-pod-like · 0.78</strong></div>
-        <div class="review-kv"><span>Capture context</span><strong>GPS available · photo 7 / 10</strong></div>
-        <div class="review-kv"><span>Next action</span><strong>Start the field check here</strong></div>
+        <div class="review-kv"><span>Farm area</span><strong id="review-area">Area B · Sample Cacao Farm</strong></div>
+        <div class="review-kv"><span>Linked tree</span><strong id="review-tree">Tree B-037 · candidate</strong></div>
+        <div class="review-kv"><span>Screening signal</span><strong id="review-signal">Black-pod-like · 0.78</strong></div>
+        <div class="review-kv"><span>Capture context</span><strong id="review-context">Location link · sample data · photo 7 / 10</strong></div>
+        <div class="review-kv"><span>Next action</span><strong id="review-next-action">Start the field check here</strong></div>
         <div class="review-actions">
           <button class="btn soft" data-review-choice="confirmed">✓ &nbsp; Confirmed in field</button>
           <button class="btn" data-review-choice="not-confirmed">○ &nbsp; Not confirmed</button>
@@ -697,9 +754,55 @@
       document.querySelectorAll('.nav button').forEach(button => button.classList.toggle('active', button.dataset.screen === name));
       if (name === 'capture') document.getElementById('role-hint').textContent = 'Check files arriving from the farm’s shared photo folder.';
       else document.getElementById('role-hint').textContent = 'Choose an area to plan the next inspection.';
+      if (name === 'area') selectPhoto('1041');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     navButtons.forEach(button => button.addEventListener('click', () => showScreen(button.dataset.screen)));
+    const photoData = {
+      '1041': { image: 'assets/pod-dark-green.png', name: 'IMG_1041.jpg · Area B', tree: 'Tree B-037 · candidate', signal: 'Black-pod-like', score: '0.78', capture: '7 / 10', linkage: '0.82', tone: 'red', located: true, nextAction: 'Start the field check here' },
+      '1042': { image: 'assets/pod-green-a.png', name: 'IMG_1042.jpg · Area B', tree: 'Tree B-038 · candidate', signal: 'No immediate warning', score: '0.12', capture: '8 / 10', linkage: '0.76', tone: 'green', located: true, nextAction: 'No immediate warning · keep monitoring' },
+      '1043': { image: 'assets/pod-orange.png', name: 'IMG_1043.jpg · Area B', tree: 'Tree B-039 · candidate', signal: 'Pest-like', score: '0.64', capture: '9 / 10', linkage: '0.69', tone: 'amber', located: true, nextAction: 'Start the field check here' },
+      '1044': { image: 'assets/pod-bagged-b.png', name: 'Follow-up sample · Area B', tree: 'Tree link pending', signal: 'Location pending', score: '—', capture: 'Pending', linkage: 'Not linked', tone: 'amber', located: false, nextAction: 'Confirm the photo location first' }
+    };
+    let selectedPhotoId = '1041';
+    function selectPhoto(id = '1041') {
+      const data = photoData[id] || photoData['1041'];
+      selectedPhotoId = photoData[id] ? id : '1041';
+      document.querySelectorAll('[data-photo-id]').forEach(button => button.classList.toggle('active', button.dataset.photoId === selectedPhotoId));
+      document.getElementById('overview-photo-thumb').src = data.image;
+      document.getElementById('overview-photo-name').textContent = data.name;
+      document.getElementById('overview-photo-meta').textContent = `${data.tree} · ${data.signal} · Capture ${data.capture}`;
+      document.getElementById('area-photo-location-card').hidden = !data.located || selectedArea !== 'B';
+      document.getElementById('area-photo-thumb').src = data.image;
+      document.getElementById('area-photo-name').textContent = `${data.name} · ${data.tree}`;
+      document.getElementById('area-photo-meta').textContent = `Location link · sample data · ${data.signal} · photo ${data.capture}`;
+      reviewPhoto.src = data.image;
+      reviewPhoto.alt = `Illustrative cacao pod photo for ${data.name}`;
+      document.getElementById('review-title').textContent = `Photo Review · ${data.name.split(' · ')[0]}`;
+      const reviewStatus = document.getElementById('review-status');
+      reviewStatus.className = `status ${data.tone}`;
+      reviewStatus.innerHTML = `<i class="dot"></i> ${data.tone === 'green' ? 'No immediate warning' : 'Review recommended'} · illustrative output`;
+      document.getElementById('review-area').textContent = `${data.name.split(' · ')[1]} · Sample Cacao Farm`;
+      document.getElementById('review-tree').textContent = data.tree;
+      document.getElementById('review-signal').textContent = `${data.signal} · ${data.score}`;
+      document.getElementById('review-context').textContent = `Location link · sample data · photo ${data.capture} · linkage ${data.linkage}`;
+      document.getElementById('review-next-action').textContent = data.nextAction;
+    }
+    function openPhotoReview(id = selectedPhotoId) {
+      selectPhoto(id);
+      document.getElementById('review-backdrop').classList.add('open');
+    }
+    document.querySelectorAll('[data-map-mode]').forEach(button => button.addEventListener('click', () => {
+      const mode = button.dataset.mapMode;
+      const map = document.getElementById('overview-map');
+      map.className = `farm-map mode-${mode}`;
+      document.querySelectorAll('[data-map-mode]').forEach(item => { item.classList.toggle('active', item === button); item.setAttribute('aria-pressed', item === button ? 'true' : 'false'); });
+      document.getElementById('map-mode-note').textContent = mode === 'photos' ? 'Photo pins show sample capture locations.' : mode === 'trees' ? 'Tree markers show sample photo-to-tree candidates.' : 'Color shows where the next field check should start.';
+    }));
+    document.querySelectorAll('.photo-marker, .locator-photo-marker').forEach(button => button.addEventListener('click', () => selectPhoto(button.dataset.photoId)));
+    document.getElementById('overview-open-photo').addEventListener('click', () => openPhotoReview());
+    document.getElementById('area-open-photo').addEventListener('click', () => openPhotoReview());
+    selectPhoto();
     function openTreeRecord(key = 'B-037') {
       const data = {
         'B-037': { title: 'Tree B-037', image: 'assets/pod-dark-green.png', signal: 'Black-pod-like', score: '0.78', note: 'Possible signal · human confirmation required', area: 'Area B', capture: '7 / 10', linkage: '0.82 · candidate', date: '31 Oct 2026', caption: 'IMG_1041.jpg · Area B', status: 'Field confirmation pending', tone: 'red' },
@@ -723,6 +826,8 @@
       document.getElementById('tree-last-checked').textContent = data.date;
       document.getElementById('tree-record-feedback').className = 'confirm-state';
       document.getElementById('field-log').hidden = true;
+      const photoId = { 'B-037': '1041', 'B-038': '1042', 'B-039': '1043' }[key];
+      if (photoId) selectPhoto(photoId);
       showScreen('tree');
     }
     document.querySelectorAll('[data-tree]').forEach(button => button.addEventListener('click', () => openTreeRecord(button.dataset.tree)));
@@ -742,6 +847,10 @@
       document.getElementById('locator-copy').textContent = `The highlighted block is the location for the details and photos shown below. Tap another block to switch areas.`;
       document.getElementById('locator-photos').textContent = data.photos;
       document.getElementById('locator-flagged').textContent = data.flagged;
+      const hasPhotoLocations = key === 'B';
+      document.getElementById('area-photo-location-card').hidden = !hasPhotoLocations;
+      document.querySelectorAll('.locator-photo-marker').forEach(marker => { marker.hidden = !hasPhotoLocations; });
+      if (hasPhotoLocations) selectPhoto('1041');
       document.querySelectorAll('[data-locator-area]').forEach(plot => {
         const selected = plot.dataset.locatorArea === key;
         plot.classList.toggle('selected', selected);
@@ -766,11 +875,7 @@
     document.querySelectorAll('[data-open-area]').forEach(button => button.addEventListener('click', () => openArea(button.dataset.openArea)));
     document.querySelectorAll('.plot button[data-area]').forEach(button => button.addEventListener('click', () => openArea(button.dataset.area)));
     document.querySelectorAll('[data-locator-area]').forEach(button => button.addEventListener('click', () => openArea(button.dataset.locatorArea)));
-    document.querySelectorAll('[data-open-review]').forEach(button => button.addEventListener('click', () => {
-      const photo = button.dataset.photo || photoTiles[0]?.dataset.photo;
-      if (photo) reviewPhoto.src = photo;
-      document.getElementById('review-backdrop').classList.add('open');
-    }));
+    document.querySelectorAll('[data-open-review]').forEach(button => button.addEventListener('click', () => openPhotoReview(button.dataset.photoId || selectedPhotoId)));
     function closeReview() { document.getElementById('review-backdrop').classList.remove('open'); }
     document.getElementById('close-review').addEventListener('click', closeReview);
     document.getElementById('review-backdrop').addEventListener('click', event => { if (event.target.id === 'review-backdrop') closeReview(); });
