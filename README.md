@@ -12,6 +12,6 @@ This repository contains only the UI prototype and generated illustrative cacao 
 
 ## Valencia operations dashboard
 
-The Valencia pilot operations dashboard is available at [`valencia-desktop/`](./valencia-desktop/). It keeps the existing demo's Farm Overview → Area Detail → Tree Record → Photo Review → Field Action workflow, but uses the Valencia status-map image and the 04 Nov historical scan snapshot (`cacaoai-pwa/data/valencia-tree-history-20261104.json`). It is the first desktop management slice; live Supabase/Drive reads and action writes are the next integration step.
+The Valencia pilot operations dashboard is available at [`valencia-desktop/`](./valencia-desktop/). It keeps the existing demo's Farm Overview → Area Detail → Tree Record → Photo Review → Field Action workflow, and uses the 04 Nov historical scan snapshot (`cacaoai-pwa/data/valencia-tree-history-20261104.json`) together with the verified Area polygons and C / Bu / B1 tree registry. The map is rendered as operational layers: satellite base map, farm boundary, Area polygons, registered tree positions, and historical scan signals. The 10/21 status image is available only as an optional reference context layer. It is the first desktop management slice; live Supabase/Drive reads and action writes are the next integration step.
 
 The page does not connect to Drive/GAS, call the CacaoAI models, collect GPS, or save feedback. Do not use it for operational decisions or add real farm photos, precise locations, credentials, model weights, or customer records.

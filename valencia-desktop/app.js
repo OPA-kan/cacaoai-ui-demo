@@ -10,9 +10,22 @@ const areaPolygons = {
 const registeredTrees = { C: 18, Bu: 74, B1: 76, F: 0, J: 0, I: 0, CA: 0 };
 const colors = { C:'#76b89a', F:'#d7a643', J:'#d66e57', I:'#7d9dc5', B1:'#9a7fbd', Bu:'#6aa7b8', CA:'#c98e55' };
 const mapBounds = { north:9.2631, south:9.26155, west:123.21802, east:123.21918 };
+const farmBoundary = [[9.261634,123.2183433],[9.2616383,123.2181857],[9.2619142,123.2180322],[9.2621967,123.2179741],[9.262377,123.2179541],[9.2628794,123.2179257],[9.262924,123.2179671],[9.263012,123.2189368],[9.2622784,123.2190573],[9.261862,123.2191018],[9.2616449,123.2187212]];
+const referenceLabels = [
+  ['D', 9.2622112, 123.2187615, 'reference'], ['A', 9.2620479, 123.2190133, 'reference'],
+  ['E', 9.2625002, 123.2187448, 'reference'], ['H', 9.2628149, 123.2187448, 'reference'],
+  ['G', 9.2627942, 123.2188678, 'reference'], ['Glico', 9.2621258, 123.2181243, 'facility'],
+  ['Cow', 9.2626605, 123.2180026, 'facility'], ['Chocobanashi', 9.2626777, 123.2180773, 'facility'],
+  ['Young', 9.2624046, 123.2180567, 'facility']
+];
 let history = null;
 let selectedTree = null;
 let currentView = 'overview';
+let farmMap = null;
+let mapLayerGroups = {};
+let referenceOverlay = null;
+let referenceContext = null;
+const registeredTreePoints = window.valenciaRegisteredTrees || [];
 
 const $ = (id) => document.getElementById(id);
 const totalSignals = (tree) => Object.values(tree.flagged || {}).reduce((sum, value) => sum + value, 0);
@@ -63,17 +76,71 @@ function renderMetrics(targetId = 'overview-metrics') {
   return priorityAreas;
 }
 
+function mapPopup(title, lines) {
+  return `<strong>${title}</strong>${lines.map((line) => `<br>${line}`).join('')}`;
+}
+
+function initFarmMap() {
+  if (farmMap || !window.L) return;
+  farmMap = L.map('farm-map', { zoomControl: false, preferCanvas: false, minZoom: 17, maxZoom: 21, maxBounds: [[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], maxBoundsViscosity: 1 }).fitBounds([[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], { padding: [8, 8] });
+  L.control.zoom({ position: 'topright' }).addTo(farmMap);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, Maxar, Earthstar Geographics', maxZoom: 20 }).addTo(farmMap);
+  mapLayerGroups.areas = L.layerGroup().addTo(farmMap);
+  mapLayerGroups.trees = L.layerGroup().addTo(farmMap);
+  mapLayerGroups.signals = L.layerGroup().addTo(farmMap);
+  referenceContext = L.layerGroup();
+  referenceOverlay = L.imageOverlay('./assets/valencia_1021_status.png', [[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], { opacity: 0.58, interactive: false });
+  drawAreaLayer();
+  drawTreeLayer();
+  drawSignalLayer();
+  document.querySelectorAll('[data-map-layer]').forEach((button) => button.addEventListener('click', () => toggleMapLayer(button.dataset.mapLayer, button)));
+}
+
+function drawAreaLayer() {
+  if (!mapLayerGroups.areas) return;
+  Object.entries(areaPolygons).forEach(([id, polygon]) => {
+    const shape = L.polygon(polygon, { color: colors[id], fillColor: colors[id], fillOpacity: 0.3, weight: 2.5 }).bindTooltip(`Area ${id}`, { sticky: true });
+    shape.on('click', () => openArea(id));
+    shape.addTo(mapLayerGroups.areas);
+    const center = polygon.reduce((sum, point) => [sum[0] + point[0], sum[1] + point[1]], [0, 0]).map((value) => value / polygon.length);
+    L.marker(center, { interactive: false, icon: L.divIcon({ className: 'area-label', html: `<span>Area ${id}</span>`, iconSize: null }) }).addTo(mapLayerGroups.areas);
+  });
+  L.polygon(farmBoundary, { color:'#173c2d', fill:false, weight:3, dashArray:'8 6' }).bindTooltip('Verified Valencia pilot farm boundary', { sticky:true }).addTo(mapLayerGroups.areas);
+  referenceLabels.forEach(([label, lat, lon, kind]) => L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: `reference-label ${kind}`, html: `<span>${label}</span>`, iconSize: null }) }).addTo(referenceContext));
+}
+
+function drawTreeLayer() {
+  if (!mapLayerGroups.trees) return;
+  registeredTreePoints.forEach((tree) => {
+    L.circleMarker([tree.position.lat, tree.position.lng], { radius:4, color:'#fff', weight:1.5, fillColor:colors[tree.areaId] || '#315f8a', fillOpacity:.98 }).bindTooltip(`Tree ${tree.number}`, { direction:'top' }).addTo(mapLayerGroups.trees);
+  });
+}
+
+function drawSignalLayer() {
+  if (!mapLayerGroups.signals) return;
+  history.trees.forEach((tree, index) => {
+    const signals = totalSignals(tree);
+    const rate = tree.photos?.length ? signals / tree.photos.length : 0;
+    const fillColor = rate >= .25 ? '#b8443e' : rate > .08 ? '#d79027' : '#4d9b6d';
+    const marker = L.circleMarker([tree.lat, tree.lon], { radius: signals ? Math.min(12, 6 + signals / 4) : 5, color:'#fff', weight:2.5, fillColor, fillOpacity:.95 });
+    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${tree.photos?.length || 0} photos · ${signals} signals`, '<em>Start the next field check here</em>']), { autoPan:false });
+    marker.on('click', () => openTree(index));
+    marker.addTo(mapLayerGroups.signals);
+  });
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${history.trees.length} scan groups · click a point to open the tree record`;
+}
+
+function toggleMapLayer(layer, button) {
+  if (!farmMap) return;
+  const targets = layer === 'reference' ? [referenceContext, referenceOverlay] : [mapLayerGroups[layer]];
+  const visible = targets.some((target) => target && farmMap.hasLayer(target));
+  targets.forEach((target) => { if (!target) return; if (visible) target.removeFrom(farmMap); else target.addTo(farmMap); });
+  button.classList.toggle('active', !visible);
+}
+
 function renderMap() {
-  const pins = history.trees.map((tree, index) => {
-    const x = ((tree.lon - mapBounds.west) / (mapBounds.east - mapBounds.west)) * 100;
-    const y = ((mapBounds.north - tree.lat) / (mapBounds.north - mapBounds.south)) * 100;
-    const count = totalSignals(tree);
-    const level = priorityClass((tree.photos?.length ? count / tree.photos.length : 0));
-    return `<button class="map-pin ${level}" style="left:${x}%;top:${y}%" data-tree-index="${index}" aria-label="${tree.label}, ${count} signals" title="${tree.label} · ${count} signals"></button>`;
-  }).join('');
-  $('map-pins').innerHTML = pins;
-  $('map-status').textContent = `${history.trees.length} GPS groups · click a point to open the tree record`;
-  document.querySelectorAll('.map-pin').forEach((pin) => pin.addEventListener('click', () => openTree(Number(pin.dataset.treeIndex))));
+  initFarmMap();
+  if (farmMap) setTimeout(() => farmMap.invalidateSize(), 50);
 }
 
 function renderPriority() {
