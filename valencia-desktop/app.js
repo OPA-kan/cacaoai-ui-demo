@@ -11,6 +11,7 @@ const registeredTrees = { C: 18, Bu: 74, B1: 76, F: 0, J: 0, I: 0, CA: 0 };
 const colors = { C:'#76b89a', F:'#d7a643', J:'#d66e57', I:'#7d9dc5', B1:'#9a7fbd', Bu:'#6aa7b8', CA:'#c98e55' };
 const mapBounds = { north:9.2631, south:9.26155, west:123.21802, east:123.21918 };
 const farmBoundary = [[9.261634,123.2183433],[9.2616383,123.2181857],[9.2619142,123.2180322],[9.2621967,123.2179741],[9.262377,123.2179541],[9.2628794,123.2179257],[9.262924,123.2179671],[9.263012,123.2189368],[9.2622784,123.2190573],[9.261862,123.2191018],[9.2616449,123.2187212]];
+const youngCandidateBoundary = [[9.2628556,123.218136],[9.2628243,123.2181106],[9.26277,123.2181166],[9.2625631,123.2181728],[9.2624058,123.2182286],[9.2624099,123.2182573],[9.2624408,123.2182824],[9.2624676,123.2182791],[9.2628405,123.2182266],[9.2628672,123.2182223]];
 const referenceLabels = [
   ['D', 9.2622112, 123.2187615, 'reference'], ['A', 9.2620479, 123.2190133, 'reference'],
   ['E', 9.2625002, 123.2187448, 'reference'], ['H', 9.2628149, 123.2187448, 'reference'],
@@ -31,6 +32,7 @@ let scanOptions = [];
 let fieldActions = [];
 let treeCoverage = { linked:0, noScan:0 };
 const registeredTreePoints = window.valenciaRegisteredTrees || [];
+const youngTreeCandidates = window.valenciaYoungTreeCandidates || [];
 
 const $ = (id) => document.getElementById(id);
 const totalSignals = (tree) => Object.values(tree.flagged || {}).reduce((sum, value) => sum + value, 0);
@@ -114,7 +116,7 @@ function renderMetrics(targetId = 'overview-metrics') {
     ['Scanned photos', history.totalPhotos, '04 Nov scan'],
     ['Disease signals', history.diseasedPhotos, `${fmtPercent(history.diseasedPhotos / history.totalPhotos)} of photos flagged`],
     ['Tree records', history.trees.length, 'Historical GPS groups'],
-    ['Tagged trees', Object.values(registeredTrees).reduce((sum, count) => sum + count, 0), 'C / Bu / B1 registry']
+    ['Tagged trees', Object.values(registeredTrees).reduce((sum, count) => sum + count, 0), `C / Bu / B1 registry · +${youngTreeCandidates.length} young candidates`]
   ];
   $(targetId).innerHTML = metrics.map(([label, value, note], index) => `<article class="metric ${index === 1 ? 'priority' : ''}"><div class="metric-label">${label}</div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></article>`).join('');
   return priorityAreas;
@@ -131,11 +133,13 @@ function initFarmMap() {
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, Maxar, Earthstar Geographics', maxNativeZoom: 18, maxZoom: 23, keepBuffer: 4 }).addTo(farmMap);
   mapLayerGroups.areas = L.layerGroup().addTo(farmMap);
   mapLayerGroups.trees = L.layerGroup().addTo(farmMap);
+  mapLayerGroups.young = L.layerGroup().addTo(farmMap);
   mapLayerGroups.signals = L.layerGroup().addTo(farmMap);
   referenceContext = L.layerGroup();
   referenceOverlay = L.imageOverlay('./assets/valencia_1021_status.png', [[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], { opacity: 0.58, interactive: false });
   drawAreaLayer();
   drawTreeLayer();
+  drawYoungLayer();
   drawSignalLayer();
   renderHeatmapControls();
   document.querySelectorAll('[data-map-layer]').forEach((button) => button.addEventListener('click', () => toggleMapLayer(button.dataset.mapLayer, button)));
@@ -167,6 +171,21 @@ function drawTreeLayer() {
   });
 }
 
+function drawYoungLayer() {
+  if (!mapLayerGroups.young) return;
+  mapLayerGroups.young.clearLayers();
+  L.polygon(youngCandidateBoundary, { color:'#65a30d', fillColor:'#bef264', fillOpacity:.08, weight:2, dashArray:'5 5' })
+    .bindTooltip('Young area · candidate positions', { sticky:true })
+    .bindPopup(mapPopup('Young area', ['64 candidate positions from the 11/04 corner survey', '<em>Candidate grid only · confirm each tree in the field</em>']), { autoPan:false })
+    .addTo(mapLayerGroups.young);
+  youngTreeCandidates.forEach((tree) => {
+    L.circleMarker([tree.position.lat, tree.position.lng], { radius:4.5, color:'#365314', weight:1.4, fillColor:'#a3e635', fillOpacity:.95, dashArray:'2 2' })
+      .bindPopup(mapPopup(tree.number, ['Young-tree candidate', 'Area Young', 'Source: 11/04 young-area 3m grid', '<em>Not field-confirmed · use this point to start the next check</em>']), { autoPan:false })
+      .bindTooltip(`${tree.number}<br>Young candidate · field confirmation pending`, { direction:'top' })
+      .addTo(mapLayerGroups.young);
+  });
+}
+
 function drawSignalLayer() {
   if (!mapLayerGroups.signals) return;
   mapLayerGroups.signals.clearLayers();
@@ -183,7 +202,7 @@ function drawSignalLayer() {
     marker.on('click', () => openTree(index));
     marker.addTo(mapLayerGroups.signals);
   });
-  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${youngTreeCandidates.length} young candidates · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
 }
 
 function renderHeatmapControls() {
@@ -287,6 +306,7 @@ function renderMap() {
   initFarmMap();
   if (farmMap) {
     drawTreeLayer();
+    drawYoungLayer();
     drawSignalLayer();
     renderHeatmapControls();
     setTimeout(() => farmMap.invalidateSize(), 50);

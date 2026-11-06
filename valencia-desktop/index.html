@@ -37,12 +37,12 @@
             <div class="metric-grid" id="overview-metrics"></div>
             <div class="dashboard-grid">
               <section class="card map-card">
-                <div class="panel-head"><div><p class="eyebrow">Valencia farm map</p><h2>Where should we look next?</h2></div><div class="map-legend"><span><i class="legend-dot none"></i>No linked scan</span><span><i class="legend-dot healthy"></i>Low signal</span><span><i class="legend-dot follow"></i>Follow-up</span><span><i class="legend-dot priority"></i>Priority</span></div></div>
-                <div class="map-toolbar"><span id="map-status">Loading Valencia map layers…</span><div class="map-layer-tools"><button class="small-button active" data-map-layer="areas" type="button">Areas</button><button class="small-button active" data-map-layer="trees" type="button">Trees</button><button class="small-button active" data-map-layer="signals" type="button">Scan signals</button><button class="small-button" data-map-layer="reference" type="button">Reference context</button><button class="small-button" data-view="trees" type="button">Open tree records →</button></div></div>
+                <div class="panel-head"><div><p class="eyebrow">Valencia farm map</p><h2>Where should we look next?</h2></div><div class="map-legend"><span><i class="legend-dot none"></i>No linked scan</span><span><i class="legend-dot healthy"></i>Low signal</span><span><i class="legend-dot follow"></i>Follow-up</span><span><i class="legend-dot priority"></i>Priority</span><span><i class="legend-dot young"></i>Young candidate</span></div></div>
+                <div class="map-toolbar"><span id="map-status">Loading Valencia map layers…</span><div class="map-layer-tools"><button class="small-button active" data-map-layer="areas" type="button">Areas</button><button class="small-button active" data-map-layer="trees" type="button">Trees</button><button class="small-button active" data-map-layer="young" type="button">Young candidates (64)</button><button class="small-button active" data-map-layer="signals" type="button">Scan signals</button><button class="small-button" data-map-layer="reference" type="button">Reference context</button><button class="small-button" data-view="trees" type="button">Open tree records →</button></div></div>
                 <div class="heatmap-toolbar"><span>Signal heatmap</span><div id="heatmap-filter" class="heatmap-filter" role="group" aria-label="Disease heatmap filter"></div></div>
                 <div class="scan-timeline"><div><span>Scan timeline</span><strong id="scan-label">All scans</strong></div><input id="scan-slider" type="range" min="0" max="2" value="2" step="1" aria-label="Select scan date" /><div id="scan-timeline-labels" class="scan-timeline-labels"></div></div>
                 <div class="farm-map" id="farm-map" aria-label="Valencia pilot farm map with area, tree, photo, and disease heatmap layers"></div>
-                <p class="map-caption">Every registered tree is shown first. Tree colors indicate the nearest confirmed scan status; gray means no scan is safely linked to that tree yet. Larger circles are GPS scan warnings, including unlinked groups. These are screening signals; the field team confirms what is actually present.</p>
+                  <p class="map-caption">Every registered tree is shown first. Tree colors indicate the nearest confirmed scan status; gray means no scan is safely linked to that tree yet. Young candidates are shown separately in lime and come from the 11/04 3 m grid survey; they are not field-confirmed tree IDs. Larger circles are GPS scan warnings, including unlinked groups. These are screening signals; the field team confirms what is actually present.</p>
               </section>
               <aside class="card priority-card"><div class="panel-head"><div><p class="eyebrow">Field queue</p><h2>Priority areas</h2></div><span class="status-badge priority">Inspect first</span></div><div class="priority-list" id="priority-list"></div><div class="callout"><strong>Recommended next step</strong><span id="next-step">Select an area to review the evidence and field actions.</span></div></aside>
             </div>
@@ -79,6 +79,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="./tree-registry.js?v=zoom-fix-1"></script>
-    <script src="./app.js?v=zoom-fix-1"></script>
+    <script src="./young-tree-registry.js?v=young-v1"></script>
+    <script src="./app.js?v=young-v1"></script>
   </body>
 </html>
