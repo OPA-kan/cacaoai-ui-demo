@@ -29,6 +29,7 @@ let heatmapFilter = 'all';
 let scanSelection = 'all';
 let scanOptions = [];
 let fieldActions = [];
+let treeCoverage = { linked:0, noScan:0 };
 const registeredTreePoints = window.valenciaRegisteredTrees || [];
 
 const $ = (id) => document.getElementById(id);
@@ -63,6 +64,25 @@ function farmScanSummary(key) {
 function buildScanOptions() {
   const keys = [...new Set(history.trees.flatMap((tree) => (tree.photos || []).map(scanKeyFromPhoto)).filter(Boolean))].sort();
   return [...keys.map((key) => ({ key, label: scanDateLabel(key) })), { key:'all', label:'All scans' }];
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const dy = (lat1 - lat2) * 111000;
+  const dx = (lon1 - lon2) * 109000;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function nearestRegisteredTree(tree) {
+  return registeredTreePoints.map((candidate) => ({ candidate, distance: distanceMeters(tree.lat, tree.lon, candidate.position.lat, candidate.position.lng) })).sort((a, b) => a.distance - b.distance)[0] || null;
+}
+
+function registeredTreeStatus(tree) {
+  const match = history.trees.map((candidate) => ({ candidate, distance: distanceMeters(tree.position.lat, tree.position.lng, candidate.lat, candidate.lon) })).sort((a, b) => a.distance - b.distance)[0];
+  if (!match || match.distance > 12 || !scanPhotos(match.candidate, scanSelection).length) return { key:'none', label:'No linked scan' };
+  const signals = treeSignalCount(match.candidate, scanSelection, scanSelection === 'all' ? heatmapFilter : 'all');
+  const rate = signals / scanPhotos(match.candidate, scanSelection).length;
+  const key = priorityClass(rate);
+  return { key, label:key === 'high' ? 'Priority' : key === 'medium' ? 'Follow-up' : 'Low signal', signals, distance:match.distance, source:match.candidate };
 }
 
 function areaForTree(tree) {
@@ -136,8 +156,14 @@ function drawAreaLayer() {
 
 function drawTreeLayer() {
   if (!mapLayerGroups.trees) return;
+  mapLayerGroups.trees.clearLayers();
+  treeCoverage = { linked:0, noScan:0 };
   registeredTreePoints.forEach((tree) => {
-    L.circleMarker([tree.position.lat, tree.position.lng], { radius:4, color:'#fff', weight:1.5, fillColor:colors[tree.areaId] || '#315f8a', fillOpacity:.98 }).bindTooltip(`Tree ${tree.number}`, { direction:'top' }).addTo(mapLayerGroups.trees);
+    const status = registeredTreeStatus(tree);
+    if (status.key === 'none') treeCoverage.noScan += 1; else treeCoverage.linked += 1;
+    const fillColor = status.key === 'high' ? '#b8443e' : status.key === 'medium' ? '#d79027' : status.key === 'low' ? '#4d9b6d' : '#9ba9a2';
+    const details = status.key === 'none' ? 'No linked scan yet' : `${status.label} · ${status.signals} signals · ${Math.round(status.distance)}m from scan GPS`;
+    L.circleMarker([tree.position.lat, tree.position.lng], { radius:4.5, color:'#fff', weight:1.5, fillColor, fillOpacity:.98 }).bindTooltip(`Tree ${tree.number}<br>${details}`, { direction:'top' }).addTo(mapLayerGroups.trees);
   });
 }
 
@@ -153,11 +179,13 @@ function drawSignalLayer() {
     const radius = Math.min(15, 5 + signals * .8);
     const halo = L.circle([tree.lat, tree.lon], { radius: Math.min(16, 4 + signals * .9), color, weight:1.5, opacity:.35, fillColor:color, fillOpacity:.1, interactive:false }).addTo(mapLayerGroups.signals);
     const marker = L.circleMarker([tree.lat, tree.lon], { radius, color:'#fff', weight:2.5, fillColor:color, fillOpacity:.92 });
-    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${signals} ${disease === 'all' ? 'signals' : signalNames[disease]}`, `${photos} photos · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)}`, '<em>Start the next field check here</em>']), { autoPan:false });
+    const registryMatch = nearestRegisteredTree(tree);
+    const registryLine = registryMatch && registryMatch.distance <= 12 ? `Registry link: ${registryMatch.candidate.number}` : 'Registry link: not confirmed';
+    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${signals} ${disease === 'all' ? 'signals' : signalNames[disease]}`, `${photos} photos · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)}`, registryLine, '<em>Start the next field check here</em>']), { autoPan:false });
     marker.on('click', () => openTree(index));
     marker.addTo(mapLayerGroups.signals);
   });
-  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${history.trees.length} scan groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
 }
 
 function renderHeatmapControls() {
@@ -169,6 +197,7 @@ function renderHeatmapControls() {
     if (button.disabled) return;
     heatmapFilter = button.dataset.heatmap;
     document.querySelectorAll('[data-heatmap]').forEach((item) => item.classList.toggle('active', item === button));
+    drawTreeLayer();
     drawSignalLayer();
   }));
 }
@@ -186,6 +215,7 @@ function renderScanTimeline() {
     if (scanSelection !== 'all') heatmapFilter = 'all';
     $('scan-label').textContent = scanOptions[Number(slider.value)]?.label || 'All scans';
     renderHeatmapControls();
+    drawTreeLayer();
     drawSignalLayer();
     renderEffectiveness();
   };
@@ -258,6 +288,7 @@ function toggleMapLayer(layer, button) {
 function renderMap() {
   initFarmMap();
   if (farmMap) {
+    drawTreeLayer();
     drawSignalLayer();
     renderHeatmapControls();
     setTimeout(() => farmMap.invalidateSize(), 50);
