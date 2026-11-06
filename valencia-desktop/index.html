@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="CacaoAI Valencia pilot farm operations dashboard" />
+    <title>CacaoAI Valencia · Farm operations</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">C</span><span><strong>CacaoAI</strong><small>Valencia pilot</small></span></div>
+        <div class="farm-picker"><span>Current farm</span><strong>Valencia DA Pilot Farm</strong><small>Negros Oriental · 1 ha pilot</small></div>
+        <p class="nav-label">Operations</p>
+        <nav class="nav" aria-label="Operations navigation">
+          <button class="nav-item active" data-view="overview"><span>⌖</span>Farm dashboard</button>
+          <button class="nav-item" data-view="areas"><span>▦</span>Areas</button>
+          <button class="nav-item" data-view="trees"><span>●</span>Tree records</button>
+          <button class="nav-item" data-view="photos"><span>▣</span>Photo review</button>
+          <button class="nav-item" data-view="actions"><span>↺</span>Field actions</button>
+          <button class="nav-item" data-view="report"><span>▤</span>Weekly report</button>
+        </nav>
+        <div class="sidebar-footer"><span class="status-dot"></span><span><strong>Pilot snapshot</strong><small>Last scan · 04 Nov 2026</small></span></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div><span class="crumb">Valencia DA Pilot Farm</span><strong id="page-title">Farm dashboard</strong></div>
+          <div class="top-actions"><span class="data-pill">HISTORICAL SNAPSHOT</span><button class="refresh-button" id="refresh-data" type="button">↻ Refresh data</button><span class="avatar">VM</span></div>
+        </header>
+
+        <div class="content">
+          <section class="view active" id="view-overview">
+            <div class="page-head"><div><p class="eyebrow">Farm manager · Valencia pilot</p><h1>Start the next field check here.</h1><p class="subtitle">A field-first view of the 04 Nov scan, registered tree positions, and follow-up workload.</p></div><div class="date-label">Last scan<br><strong>04 Nov 2026</strong></div></div>
+            <div class="metric-grid" id="overview-metrics"></div>
+            <div class="dashboard-grid">
+              <section class="card map-card">
+                <div class="panel-head"><div><p class="eyebrow">Valencia farm map</p><h2>Where should we look next?</h2></div><div class="map-legend"><span><i class="legend-dot healthy"></i>Low signal</span><span><i class="legend-dot follow"></i>Follow-up</span><span><i class="legend-dot priority"></i>Priority</span></div></div>
+                <div class="map-toolbar"><span id="map-status">Loading scan positions…</span><button class="small-button" data-view="trees" type="button">Open tree records →</button></div>
+                <div class="farm-map" id="farm-map" aria-label="Valencia pilot farm map with historical scan positions"><img src="./assets/valencia_1021_status.png" alt="Valencia cacao farm status map" /><div class="map-boundary-label">VALENCIA PILOT FARM</div><div class="map-pins" id="map-pins"></div></div>
+                <p class="map-caption">The yellow boundary and Area labels follow the 10/21 Valencia status map. Colored points are historical GPS groups; they prioritize a field check and do not confirm disease.</p>
+              </section>
+              <aside class="card priority-card"><div class="panel-head"><div><p class="eyebrow">Field queue</p><h2>Priority areas</h2></div><span class="status-badge priority">Inspect first</span></div><div class="priority-list" id="priority-list"></div><div class="callout"><strong>Recommended next step</strong><span id="next-step">Select an area to review the evidence and field actions.</span></div></aside>
+            </div>
+            <div class="bottom-grid"><section class="card signal-card"><div class="panel-head"><div><p class="eyebrow">Signals in the latest scan</p><h2>What was detected?</h2></div><span class="muted">203 flagged photos</span></div><div id="signal-list" class="signal-list"></div><p class="card-note">Labels describe model signals. The field team confirms what is actually present.</p></section><section class="card workflow-card"><div class="panel-head"><div><p class="eyebrow">Operational loop</p><h2>From photo to action</h2></div></div><div class="workflow"><div><b>01</b><strong>PWA capture</strong><span>Photo, GPS, Area, tree number</span></div><div><b>02</b><strong>Desktop review</strong><span>Prioritize the next field check</span></div><div><b>03</b><strong>Field action</strong><span>Record treatment and recheck date</span></div></div></section></div>
+          </section>
+
+          <section class="view" id="view-areas">
+            <div class="page-head"><div><p class="eyebrow">Farm manager · Area workload</p><h1>Area operations</h1><p class="subtitle">Compare scan workload with the verified Valencia blocks before assigning the next visit.</p></div><div class="date-label">7 mapped areas<br><strong>168 tagged trees</strong></div></div>
+            <section class="card"><div class="table-head"><div><h2>Area status</h2><p class="section-note">Historical scan groups are assigned by GPS to the mapped Area when the polygons overlap.</p></div><button class="small-button" data-view="report" type="button">Open weekly report →</button></div><div class="table-wrap"><table><thead><tr><th>Area</th><th>Registered trees</th><th>Scan groups</th><th>Photos</th><th>Signals</th><th>Priority</th></tr></thead><tbody id="area-table"></tbody></table></div></section>
+          </section>
+
+          <section class="view" id="view-trees">
+            <div class="page-head"><div><p class="eyebrow">Farm manager · Tree records</p><h1>Tree records</h1><p class="subtitle">Open a tree group to see the historical photo count, pod detections, and signals that need field confirmation.</p></div><div class="date-label"><strong id="tree-count-label">95</strong><br>historical GPS groups</div></div>
+            <section class="card"><div class="table-head"><div><h2>Prioritized tree groups</h2><p class="section-note">Search by W-label or registered tree number.</p></div><input class="search-input" id="tree-search" type="search" placeholder="Search W31 or B1-037" /></div><div class="tree-layout"><div class="tree-list" id="tree-list"></div><aside class="tree-detail" id="tree-detail"><div class="empty-detail"><span>●</span><strong>Select a tree record</strong><small>Its scan history and next action will appear here.</small></div></aside></div></section>
+          </section>
+
+          <section class="view" id="view-photos">
+            <div class="page-head"><div><p class="eyebrow">Farm manager · Photo review</p><h1>Photo review queue</h1><p class="subtitle">Review the highest-signal records first, then send the next field check to the staff team.</p></div><div class="date-label"><strong id="photo-count-label">685</strong><br>scanned photos</div></div>
+            <section class="card"><div class="table-head"><div><h2>Priority photo records</h2><p class="section-note">Photo binaries stay in Drive; this screen uses the stored metadata and model result.</p></div><select class="select-input" id="photo-filter"><option value="all">All signals</option><option value="black_pod">Black pod</option><option value="pest">Pest-like</option><option value="charcoal_pod_rot">Charcoal pod rot</option><option value="frosty_pod">Frosty pod</option></select></div><div class="photo-review-grid" id="photo-review-grid"></div></section>
+          </section>
+
+          <section class="view" id="view-actions">
+            <div class="page-head"><div><p class="eyebrow">Farm manager · Field actions</p><h1>Field actions</h1><p class="subtitle">Keep treatment decisions beside the Area or tree they belong to.</p></div><button class="primary-button" id="new-action" type="button">＋ Record field action</button></div>
+            <div class="action-layout"><section class="card"><div class="panel-head"><div><p class="eyebrow">Action log</p><h2>Recent actions</h2></div><span class="status-badge neutral">Synced records</span></div><div class="empty-state"><span>↺</span><strong>No synced field actions in this snapshot</strong><small>New actions from the mobile PWA will appear here after sync.</small></div></section><aside class="card action-explainer"><p class="eyebrow">Why this matters</p><h2>Close the loop.</h2><p>AI signals only tell the team where to start. The action record tells the next visit what happened, who did it, and when to check again.</p><div class="quote">“Start the next field check here.”</div></aside></div>
+          </section>
+
+          <section class="view" id="view-report">
+            <div class="page-head"><div><p class="eyebrow">Farm manager · Weekly action summary</p><h1>Valencia weekly report</h1><p class="subtitle">A concise management view of the latest scan and the next field priorities.</p></div><button class="primary-button" id="download-report" type="button">↓ Export summary</button></div>
+            <div class="metric-grid" id="report-metrics"></div><div class="report-grid"><section class="card"><div class="panel-head"><div><p class="eyebrow">Signal mix</p><h2>Latest disease signals</h2></div></div><div id="report-signals" class="signal-list"></div><p class="card-note">Always show the denominator and confirm in the field before treatment.</p></section><section class="card"><div class="panel-head"><div><p class="eyebrow">Next week</p><h2>Recommended actions</h2></div></div><ol class="recommendations" id="recommendations"></ol></section></div></section>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
