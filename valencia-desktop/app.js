@@ -26,6 +26,9 @@ let mapLayerGroups = {};
 let referenceOverlay = null;
 let referenceContext = null;
 let heatmapFilter = 'all';
+let scanSelection = 'all';
+let scanOptions = [];
+let fieldActions = [];
 const registeredTreePoints = window.valenciaRegisteredTrees || [];
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +44,25 @@ function pointInPolygon(point, polygon) {
     if (intersect) inside = !inside;
   }
   return inside;
+}
+
+function scanKeyFromPhoto(photo) { return photo?.url?.match(/scan_(\d+)/)?.[1] || null; }
+function scanDateLabel(key) { return key === '1028' ? '28 Oct 2026' : key === '1104' ? '04 Nov 2026' : 'All scans'; }
+function scanPhotos(tree, key = scanSelection) { return key === 'all' ? (tree.photos || []) : (tree.photos || []).filter((photo) => scanKeyFromPhoto(photo) === key); }
+function treeSignalCount(tree, key = scanSelection, disease = heatmapFilter) {
+  if (key === 'all' && disease !== 'all') return tree.flagged?.[disease] || 0;
+  if (key === 'all') return totalSignals(tree);
+  return scanPhotos(tree, key).reduce((sum, photo) => sum + (photo.flagged || 0), 0);
+}
+function farmScanSummary(key) {
+  return history.trees.reduce((summary, tree) => {
+    scanPhotos(tree, key).forEach((photo) => { summary.photos += 1; summary.flagged += photo.flagged || 0; summary.pods += photo.pods || 0; });
+    return summary;
+  }, { photos:0, flagged:0, pods:0 });
+}
+function buildScanOptions() {
+  const keys = [...new Set(history.trees.flatMap((tree) => (tree.photos || []).map(scanKeyFromPhoto)).filter(Boolean))].sort();
+  return [...keys.map((key) => ({ key, label: scanDateLabel(key) })), { key:'all', label:'All scans' }];
 }
 
 function areaForTree(tree) {
@@ -122,30 +144,107 @@ function drawTreeLayer() {
 function drawSignalLayer() {
   if (!mapLayerGroups.signals) return;
   mapLayerGroups.signals.clearLayers();
-  const color = signalColors[heatmapFilter] || signalColors.all;
+  const disease = scanSelection === 'all' ? heatmapFilter : 'all';
+  const color = signalColors[disease] || signalColors.all;
   history.trees.forEach((tree, index) => {
-    const signals = heatmapFilter === 'all' ? totalSignals(tree) : (tree.flagged?.[heatmapFilter] || 0);
+    const signals = treeSignalCount(tree, scanSelection, disease);
     if (!signals) return;
-    const rate = tree.photos?.length ? signals / tree.photos.length : 0;
+    const photos = scanPhotos(tree, scanSelection).length;
     const radius = Math.min(15, 5 + signals * .8);
     const halo = L.circle([tree.lat, tree.lon], { radius: Math.min(16, 4 + signals * .9), color, weight:1.5, opacity:.35, fillColor:color, fillOpacity:.1, interactive:false }).addTo(mapLayerGroups.signals);
     const marker = L.circleMarker([tree.lat, tree.lon], { radius, color:'#fff', weight:2.5, fillColor:color, fillOpacity:.92 });
-    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${signals} ${heatmapFilter === 'all' ? 'signals' : signalNames[heatmapFilter]}`, `${tree.photos?.length || 0} photos`, '<em>Start the next field check here</em>']), { autoPan:false });
+    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${signals} ${disease === 'all' ? 'signals' : signalNames[disease]}`, `${photos} photos · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)}`, '<em>Start the next field check here</em>']), { autoPan:false });
     marker.on('click', () => openTree(index));
     marker.addTo(mapLayerGroups.signals);
   });
-  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${history.trees.length} scan groups · ${heatmapFilter === 'all' ? 'all signals' : signalNames[heatmapFilter]} heatmap`;
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${history.trees.length} scan groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
 }
 
 function renderHeatmapControls() {
-  const allCount = Object.values(history.diseaseTypeCounts).reduce((sum, value) => sum + value, 0);
+  const allCount = scanSelection === 'all' ? history.diseasedPhotos : farmScanSummary(scanSelection).flagged;
   const entries = [['all', allCount], ...Object.entries(history.diseaseTypeCounts)];
-  $('heatmap-filter').innerHTML = entries.map(([key, count]) => `<button class="heatmap-button ${key === heatmapFilter ? 'active' : ''}" data-heatmap="${key}" type="button"><i style="background:${signalColors[key] || signalColors.all}"></i>${key === 'all' ? 'All signals' : signalNames[key] || key}<b>${count}</b></button>`).join('');
+  const dateSpecific = scanSelection !== 'all';
+  $('heatmap-filter').innerHTML = entries.map(([key, count]) => `<button class="heatmap-button ${key === heatmapFilter && !dateSpecific ? 'active' : ''} ${dateSpecific && key !== 'all' ? 'disabled' : ''}" data-heatmap="${key}" type="button" ${dateSpecific && key !== 'all' ? 'disabled' : ''}><i style="background:${signalColors[key] || signalColors.all}"></i>${key === 'all' ? 'All signals' : signalNames[key] || key}<b>${dateSpecific && key !== 'all' ? '—' : count}</b></button>`).join('');
   document.querySelectorAll('[data-heatmap]').forEach((button) => button.addEventListener('click', () => {
+    if (button.disabled) return;
     heatmapFilter = button.dataset.heatmap;
     document.querySelectorAll('[data-heatmap]').forEach((item) => item.classList.toggle('active', item === button));
     drawSignalLayer();
   }));
+}
+
+function renderScanTimeline() {
+  scanOptions = buildScanOptions();
+  const selectedIndex = Math.max(0, scanOptions.findIndex((option) => option.key === scanSelection));
+  const slider = $('scan-slider');
+  slider.max = String(scanOptions.length - 1);
+  slider.value = String(selectedIndex);
+  $('scan-label').textContent = scanOptions[selectedIndex]?.label || 'All scans';
+  $('scan-timeline-labels').innerHTML = scanOptions.map((option) => `<span>${option.label.replace(' 2026', '')}</span>`).join('');
+  slider.oninput = () => {
+    scanSelection = scanOptions[Number(slider.value)]?.key || 'all';
+    if (scanSelection !== 'all') heatmapFilter = 'all';
+    $('scan-label').textContent = scanOptions[Number(slider.value)]?.label || 'All scans';
+    renderHeatmapControls();
+    drawSignalLayer();
+    renderEffectiveness();
+  };
+}
+
+function treesForAction(action) {
+  const target = action.target.toLowerCase().replace(/^tree\s+/, '').trim();
+  if (target.startsWith('area ')) return history.trees.filter((tree) => areaForTree(tree).toLowerCase() === target.replace('area ', ''));
+  return history.trees.filter((tree) => tree.label.toLowerCase().includes(target));
+}
+
+function summarizeTrees(trees, key) {
+  return trees.reduce((summary, tree) => {
+    scanPhotos(tree, key).forEach((photo) => { summary.photos += 1; summary.flagged += photo.flagged || 0; });
+    return summary;
+  }, { photos:0, flagged:0 });
+}
+
+function actionOutcome(action, firstKey, latestKey) {
+  const trees = treesForAction(action);
+  if (!trees.length) return null;
+  const before = summarizeTrees(trees, firstKey);
+  const after = summarizeTrees(trees, latestKey);
+  if (!before.photos || !after.photos) return null;
+  const beforeRate = before.flagged / before.photos;
+  const afterRate = after.flagged / after.photos;
+  return { trees, before, after, beforeRate, afterRate, delta: afterRate - beforeRate };
+}
+
+function renderEffectiveness() {
+  const summaries = scanOptions.filter((option) => option.key !== 'all').map((option) => ({ ...option, summary: farmScanSummary(option.key) }));
+  const first = summaries[0];
+  const latest = summaries[summaries.length - 1];
+  if (!first || !latest) return;
+  const firstRate = first.summary.photos ? first.summary.flagged / first.summary.photos : 0;
+  const latestRate = latest.summary.photos ? latest.summary.flagged / latest.summary.photos : 0;
+  const delta = latestRate - firstRate;
+  const maxRate = Math.max(firstRate, latestRate, .01);
+  const actionText = fieldActions.length ? `${fieldActions.length} local field action${fieldActions.length === 1 ? '' : 's'} recorded` : 'No treatment record linked yet';
+  const latestOutcome = fieldActions[0] ? actionOutcome(fieldActions[0], first.key, latest.key) : null;
+  const targetOutcome = latestOutcome ? `<div class="linked-outcome"><div><p class="eyebrow">Selected action outcome</p><h3>${fieldActions[0].target} · ${fieldActions[0].treatment}</h3><p>${latestOutcome.trees.length} matching tree record${latestOutcome.trees.length === 1 ? '' : 's'} · compare ${first.label} with ${latest.label}</p></div><div class="linked-outcome-metrics"><span><b>${fmtPercent(latestOutcome.beforeRate)}</b><small>before</small></span><strong>${latestOutcome.delta <= 0 ? '↓' : '↑'} ${Math.abs(Math.round(latestOutcome.delta * 100))} pts</strong><span><b>${fmtPercent(latestOutcome.afterRate)}</b><small>after</small></span></div></div>` : fieldActions.length ? `<div class="linked-outcome muted-outcome"><strong>Action saved, but its target does not yet match a Tree/Area record with both scan dates.</strong><span>Use a target such as “Tree W31” or “Area J” to connect the next scan.</span></div>` : '';
+  $('effectiveness-panel').innerHTML = `<div class="panel-head"><div><p class="eyebrow">Scan comparison · farm level</p><h2>Did the field action help?</h2><p class="section-note">Observed signal change is shown first. Treatment effectiveness is attributed only after an action is linked to a Tree or Area and a recheck scan is available.</p></div><span class="status-badge ${fieldActions.length ? 'neutral' : 'priority'}">${actionText}</span></div><div class="outcome-grid"><div class="outcome-summary"><span>Observed change</span><strong>${delta <= 0 ? '↓' : '↑'} ${Math.abs(Math.round(delta * 100))} pts</strong><small>${first.label} → ${latest.label} flagged-photo rate</small></div>${summaries.map((item) => { const rate = item.summary.photos ? item.summary.flagged / item.summary.photos : 0; return `<div class="outcome-period"><div><strong>${item.label}</strong><span>${item.summary.flagged} / ${item.summary.photos} flagged</span></div><div class="outcome-bar"><i style="width:${Math.round(rate / maxRate * 100)}%"></i></div><small>${fmtPercent(rate)} flagged · ${item.summary.pods} pod detections</small></div>`; }).join('')}</div>${targetOutcome}<div class="outcome-footer"><span><b>Interpretation:</b> This is a scan-to-scan comparison, not proof of treatment effect.</span><button class="small-button" data-view="actions" type="button">Open action log →</button></div>`;
+  $('effectiveness-panel').querySelector('[data-view="actions"]').addEventListener('click', () => openView('actions'));
+}
+
+function loadFieldActions() {
+  try { return JSON.parse(localStorage.getItem('cacaoai.valencia.fieldActions') || '[]'); } catch { return []; }
+}
+
+function saveFieldActions() { localStorage.setItem('cacaoai.valencia.fieldActions', JSON.stringify(fieldActions)); }
+
+function renderActionLog() {
+  const target = $('action-log');
+  if (!fieldActions.length) {
+    target.innerHTML = '<div class="empty-state"><span>↺</span><strong>No field actions recorded in this browser</strong><small>Record the treatment and recheck date to connect the next scan to an action.</small></div>';
+    return;
+  }
+  const scanKeys = scanOptions.filter((option) => option.key !== 'all');
+  target.innerHTML = fieldActions.map((action) => { const outcome = scanKeys.length >= 2 ? actionOutcome(action, scanKeys[0].key, scanKeys[scanKeys.length - 1].key) : null; const result = outcome ? `<div class="action-result"><span>Observed after recheck</span><strong>${outcome.delta <= 0 ? '↓' : '↑'} ${Math.abs(Math.round(outcome.delta * 100))} pts</strong><small>${fmtPercent(outcome.beforeRate)} → ${fmtPercent(outcome.afterRate)} flagged-photo rate</small></div>` : '<div class="action-result pending"><span>Outcome</span><strong>Awaiting linked recheck</strong><small>Need matching Tree/Area records and both scan dates</small></div>'; return `<article class="action-row"><div class="action-row-head"><strong>${action.target}</strong><span class="status-badge neutral">Local draft</span></div><p>${action.treatment}</p><small>${action.actionDate} · Recheck ${action.recheckDate}</small>${action.note ? `<em>${action.note}</em>` : ''}${result}</article>`; }).join('');
 }
 
 function toggleMapLayer(layer, button) {
@@ -226,13 +325,16 @@ async function loadData() {
   const response = await fetch('../cacaoai-pwa/data/valencia-tree-history-20261104.json');
   if (!response.ok) throw new Error(`Data load failed (${response.status})`);
   history = await response.json();
-  renderMetrics(); renderMap(); renderPriority(); renderSignals('signal-list'); renderAreas(); renderTrees(); renderPhotos(); renderReport();
+  fieldActions = loadFieldActions();
+  scanOptions = buildScanOptions();
+  renderScanTimeline(); renderMetrics(); renderMap(); renderPriority(); renderSignals('signal-list'); renderAreas(); renderTrees(); renderPhotos(); renderReport(); renderEffectiveness(); renderActionLog();
 }
 
 document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => openView(button.dataset.view)));
 $('tree-search').addEventListener('input', (event) => renderTrees(event.target.value));
 $('photo-filter').addEventListener('change', (event) => renderPhotos(event.target.value));
 $('refresh-data').addEventListener('click', async () => { try { await loadData(); showToast('Valencia snapshot refreshed.'); } catch (error) { showToast(error.message); } });
-$('new-action').addEventListener('click', () => showToast('Field action entry will be connected to Supabase in the next integration slice.'));
+$('new-action').addEventListener('click', () => { openView('actions'); setTimeout(() => $('action-target').focus(), 50); });
+$('action-form').addEventListener('submit', (event) => { event.preventDefault(); fieldActions.unshift({ id: Date.now(), target: $('action-target').value.trim(), treatment: $('action-treatment').value.trim(), actionDate: $('action-date').value, recheckDate: $('action-recheck').value, note: $('action-note').value.trim() }); saveFieldActions(); renderActionLog(); renderEffectiveness(); event.target.reset(); showToast('Field action saved locally.'); });
 $('download-report').addEventListener('click', () => { const lines = [`Valencia DA Pilot Farm — scan ${history.scanDate}`, `Scanned photos: ${history.totalPhotos}`, `Disease signals: ${history.diseasedPhotos}`, `Tree records: ${history.trees.length}`, ...Object.entries(history.diseaseTypeCounts).map(([key, value]) => `${signalNames[key] || key}: ${value}`)]; const blob = new Blob([lines.join('\n')], { type:'text/plain' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'valencia-cacao-weekly-summary.txt'; link.click(); URL.revokeObjectURL(link.href); });
 loadData().catch((error) => { $('map-status').textContent = error.message; showToast(error.message); });
