@@ -126,9 +126,9 @@ function mapPopup(title, lines) {
 
 function initFarmMap() {
   if (farmMap || !window.L) return;
-  farmMap = L.map('farm-map', { zoomControl: false, preferCanvas: false, minZoom: 17, maxZoom: 21, maxBounds: [[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], maxBoundsViscosity: 1 }).fitBounds([[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], { padding: [8, 8] });
+  farmMap = L.map('farm-map', { zoomControl: false, preferCanvas: false, minZoom: 17, maxZoom: 23, maxBounds: [[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], maxBoundsViscosity: .75 }).fitBounds([[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], { padding: [8, 8] });
   L.control.zoom({ position: 'topright' }).addTo(farmMap);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, Maxar, Earthstar Geographics', maxZoom: 20 }).addTo(farmMap);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, Maxar, Earthstar Geographics', maxNativeZoom: 18, maxZoom: 23, keepBuffer: 4 }).addTo(farmMap);
   mapLayerGroups.areas = L.layerGroup().addTo(farmMap);
   mapLayerGroups.trees = L.layerGroup().addTo(farmMap);
   mapLayerGroups.signals = L.layerGroup().addTo(farmMap);
@@ -176,9 +176,7 @@ function drawSignalLayer() {
     const signals = treeSignalCount(tree, scanSelection, disease);
     if (!signals) return;
     const photos = scanPhotos(tree, scanSelection).length;
-    const radius = Math.min(15, 5 + signals * .8);
-    const halo = L.circle([tree.lat, tree.lon], { radius: Math.min(16, 4 + signals * .9), color, weight:1.5, opacity:.35, fillColor:color, fillOpacity:.1, interactive:false }).addTo(mapLayerGroups.signals);
-    const marker = L.circleMarker([tree.lat, tree.lon], { radius, color:'#fff', weight:2.5, fillColor:color, fillOpacity:.92 });
+    const marker = L.circleMarker([tree.lat, tree.lon], { radius:Math.min(9, 5 + Math.log1p(signals) * .8), color:'#fff', weight:2.5, fillColor:color, fillOpacity:.92 });
     const registryMatch = nearestRegisteredTree(tree);
     const registryLine = registryMatch && registryMatch.distance <= 12 ? `Registry link: ${registryMatch.candidate.number}` : 'Registry link: not confirmed';
     marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${signals} ${disease === 'all' ? 'signals' : signalNames[disease]}`, `${photos} photos · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)}`, registryLine, '<em>Start the next field check here</em>']), { autoPan:false });
