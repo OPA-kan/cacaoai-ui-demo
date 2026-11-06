@@ -25,11 +25,13 @@ let farmMap = null;
 let mapLayerGroups = {};
 let referenceOverlay = null;
 let referenceContext = null;
+let heatmapFilter = 'all';
 const registeredTreePoints = window.valenciaRegisteredTrees || [];
 
 const $ = (id) => document.getElementById(id);
 const totalSignals = (tree) => Object.values(tree.flagged || {}).reduce((sum, value) => sum + value, 0);
 const signalNames = { black_pod:'Black pod', pest:'Pest-like', charcoal_pod_rot:'Charcoal pod rot', frosty_pod:'Frosty pod' };
+const signalColors = { all:'#b8443e', black_pod:'#6d5b55', pest:'#d79027', charcoal_pod_rot:'#7b5b45', frosty_pod:'#6b7db0' };
 
 function pointInPolygon(point, polygon) {
   let inside = false;
@@ -93,6 +95,7 @@ function initFarmMap() {
   drawAreaLayer();
   drawTreeLayer();
   drawSignalLayer();
+  renderHeatmapControls();
   document.querySelectorAll('[data-map-layer]').forEach((button) => button.addEventListener('click', () => toggleMapLayer(button.dataset.mapLayer, button)));
 }
 
@@ -118,16 +121,31 @@ function drawTreeLayer() {
 
 function drawSignalLayer() {
   if (!mapLayerGroups.signals) return;
+  mapLayerGroups.signals.clearLayers();
+  const color = signalColors[heatmapFilter] || signalColors.all;
   history.trees.forEach((tree, index) => {
-    const signals = totalSignals(tree);
+    const signals = heatmapFilter === 'all' ? totalSignals(tree) : (tree.flagged?.[heatmapFilter] || 0);
+    if (!signals) return;
     const rate = tree.photos?.length ? signals / tree.photos.length : 0;
-    const fillColor = rate >= .25 ? '#b8443e' : rate > .08 ? '#d79027' : '#4d9b6d';
-    const marker = L.circleMarker([tree.lat, tree.lon], { radius: signals ? Math.min(12, 6 + signals / 4) : 5, color:'#fff', weight:2.5, fillColor, fillOpacity:.95 });
-    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${tree.photos?.length || 0} photos · ${signals} signals`, '<em>Start the next field check here</em>']), { autoPan:false });
+    const radius = Math.min(15, 5 + signals * .8);
+    const halo = L.circle([tree.lat, tree.lon], { radius: Math.min(16, 4 + signals * .9), color, weight:1.5, opacity:.35, fillColor:color, fillOpacity:.1, interactive:false }).addTo(mapLayerGroups.signals);
+    const marker = L.circleMarker([tree.lat, tree.lon], { radius, color:'#fff', weight:2.5, fillColor:color, fillOpacity:.92 });
+    marker.bindPopup(mapPopup(tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label, [`Area ${areaForTree(tree)}`, `${signals} ${heatmapFilter === 'all' ? 'signals' : signalNames[heatmapFilter]}`, `${tree.photos?.length || 0} photos`, '<em>Start the next field check here</em>']), { autoPan:false });
     marker.on('click', () => openTree(index));
     marker.addTo(mapLayerGroups.signals);
   });
-  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${history.trees.length} scan groups · click a point to open the tree record`;
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${history.trees.length} scan groups · ${heatmapFilter === 'all' ? 'all signals' : signalNames[heatmapFilter]} heatmap`;
+}
+
+function renderHeatmapControls() {
+  const allCount = Object.values(history.diseaseTypeCounts).reduce((sum, value) => sum + value, 0);
+  const entries = [['all', allCount], ...Object.entries(history.diseaseTypeCounts)];
+  $('heatmap-filter').innerHTML = entries.map(([key, count]) => `<button class="heatmap-button ${key === heatmapFilter ? 'active' : ''}" data-heatmap="${key}" type="button"><i style="background:${signalColors[key] || signalColors.all}"></i>${key === 'all' ? 'All signals' : signalNames[key] || key}<b>${count}</b></button>`).join('');
+  document.querySelectorAll('[data-heatmap]').forEach((button) => button.addEventListener('click', () => {
+    heatmapFilter = button.dataset.heatmap;
+    document.querySelectorAll('[data-heatmap]').forEach((item) => item.classList.toggle('active', item === button));
+    drawSignalLayer();
+  }));
 }
 
 function toggleMapLayer(layer, button) {
@@ -140,7 +158,11 @@ function toggleMapLayer(layer, button) {
 
 function renderMap() {
   initFarmMap();
-  if (farmMap) setTimeout(() => farmMap.invalidateSize(), 50);
+  if (farmMap) {
+    drawSignalLayer();
+    renderHeatmapControls();
+    setTimeout(() => farmMap.invalidateSize(), 50);
+  }
 }
 
 function renderPriority() {
