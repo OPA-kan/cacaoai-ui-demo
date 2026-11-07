@@ -28,7 +28,7 @@
       <main class="main">
         <header class="topbar">
           <div><span class="crumb">Valencia DA Pilot Farm</span><strong id="page-title">Farm dashboard</strong></div>
-          <div class="top-actions"><span class="data-pill">HISTORICAL SNAPSHOT</span><button class="refresh-button" id="refresh-data" type="button">↻ Refresh data</button><span class="avatar">VM</span></div>
+          <div class="top-actions"><span class="data-pill" id="cloud-status">CONNECTING…</span><button class="refresh-button" id="refresh-data" type="button">↻ Refresh data</button><span class="avatar">VM</span></div>
         </header>
 
         <div class="content">
@@ -37,8 +37,8 @@
             <div class="metric-grid" id="overview-metrics"></div>
             <div class="dashboard-grid">
               <section class="card map-card">
-                <div class="panel-head"><div><p class="eyebrow">Valencia farm map</p><h2>Where should we look next?</h2></div><div class="map-legend"><span><i class="legend-dot none"></i>No linked scan</span><span><i class="legend-dot healthy"></i>Low signal</span><span><i class="legend-dot follow"></i>Follow-up</span><span><i class="legend-dot priority"></i>Priority</span><span><i class="legend-dot young"></i>Young candidate</span></div></div>
-                <div class="map-toolbar"><span id="map-status">Loading Valencia map layers…</span><div class="map-layer-tools"><button class="small-button active" data-map-layer="areas" type="button">Areas</button><button class="small-button active" data-map-layer="trees" type="button">Trees</button><button class="small-button active" data-map-layer="young" type="button">Young candidates (64)</button><button class="small-button active" data-map-layer="signals" type="button">Scan signals</button><button class="small-button" data-map-layer="reference" type="button">Reference context</button><button class="small-button" data-view="trees" type="button">Open tree records →</button></div></div>
+                <div class="panel-head"><div><p class="eyebrow">Valencia farm map</p><h2>Where should we look next?</h2></div><div class="map-legend"><span><i class="legend-dot none"></i>No linked scan</span><span><i class="legend-dot healthy"></i>Low signal</span><span><i class="legend-dot follow"></i>Follow-up</span><span><i class="legend-dot priority"></i>Priority</span><span><i class="legend-dot young"></i>Young candidate</span><span><i class="legend-dot cloud"></i>PWA upload</span></div></div>
+                <div class="map-toolbar"><span id="map-status">Loading Valencia map layers…</span><div class="map-layer-tools"><button class="small-button active" data-map-layer="areas" type="button">Areas</button><button class="small-button active" data-map-layer="trees" type="button">Trees</button><button class="small-button active" data-map-layer="young" type="button">Young candidates (64)</button><button class="small-button active" data-map-layer="cloud" type="button">PWA uploads</button><button class="small-button active" data-map-layer="signals" type="button">Scan signals</button><button class="small-button" data-map-layer="reference" type="button">Reference context</button><button class="small-button" data-view="trees" type="button">Open tree records →</button></div></div>
                 <div class="heatmap-toolbar"><span>Signal heatmap</span><div id="heatmap-filter" class="heatmap-filter" role="group" aria-label="Disease heatmap filter"></div></div>
                 <div class="scan-timeline"><div><span>Scan timeline</span><strong id="scan-label">All scans</strong></div><input id="scan-slider" type="range" min="0" max="2" value="2" step="1" aria-label="Select scan date" /><div id="scan-timeline-labels" class="scan-timeline-labels"></div></div>
                 <div class="farm-map" id="farm-map" aria-label="Valencia pilot farm map with area, tree, photo, and disease heatmap layers"></div>
@@ -80,6 +80,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="./tree-registry.js?v=zoom-fix-1"></script>
     <script src="./young-tree-registry.js?v=young-v1"></script>
-    <script src="./app.js?v=young-v1"></script>
+    <script src="./cacaoai-desktop-config.js?v=cloud-v1"></script>
+    <script src="./cloud-bridge.js?v=cloud-v1"></script>
+    <script src="./app.js?v=cloud-v1"></script>
   </body>
 </html>

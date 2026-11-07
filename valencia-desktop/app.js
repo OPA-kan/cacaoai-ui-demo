@@ -33,8 +33,11 @@ let fieldActions = [];
 let treeCoverage = { linked:0, noScan:0 };
 const registeredTreePoints = window.valenciaRegisteredTrees || [];
 const youngTreeCandidates = window.valenciaYoungTreeCandidates || [];
+let cloudSnapshot = { photos:[], actions:[], status:'not-loaded', error:null };
 
 const $ = (id) => document.getElementById(id);
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
+const safeExternalUrl = (value) => { try { const url = new URL(String(value)); return ['https:','http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
 const totalSignals = (tree) => Object.values(tree.flagged || {}).reduce((sum, value) => sum + value, 0);
 const signalNames = { black_pod:'Black pod', pest:'Pest-like', charcoal_pod_rot:'Charcoal pod rot', frosty_pod:'Frosty pod' };
 const signalColors = { all:'#b8443e', black_pod:'#6d5b55', pest:'#d79027', charcoal_pod_rot:'#7b5b45', frosty_pod:'#6b7db0' };
@@ -66,6 +69,97 @@ function farmScanSummary(key) {
 function buildScanOptions() {
   const keys = [...new Set(history.trees.flatMap((tree) => (tree.photos || []).map(scanKeyFromPhoto)).filter(Boolean))].sort();
   return [...keys.map((key) => ({ key, label: scanDateLabel(key) })), { key:'all', label:'All scans' }];
+}
+
+function normalizeRemoteSignal(signal) {
+  if (!signal) return { flagged:0, pods:0, type:null };
+  let value = signal;
+  if (typeof signal === 'string') { try { value = JSON.parse(signal); } catch { value = { label:signal }; } }
+  if (typeof value === 'number') return { flagged:value, pods:0, type:null };
+  const label = String(value.label || value.disease || value.disease_type || value.class || value.type || '').toLowerCase();
+  const type = label.includes('black') ? 'black_pod' : label.includes('frosty') ? 'frosty_pod' : label.includes('charcoal') ? 'charcoal_pod_rot' : label.includes('pest') ? 'pest' : null;
+  const flagged = Number(value.flagged ?? (value.warning || value.disease_probability >= .5 ? 1 : 0)) || 0;
+  const pods = Number(value.pods ?? value.pod_count ?? value.detection_count ?? 0) || 0;
+  return { flagged, pods, type };
+}
+
+function remotePhotoRecord(row) {
+  const signal = normalizeRemoteSignal(row.signal);
+  const lat = Number(row.latitude), lon = Number(row.longitude);
+  const driveUrl = safeExternalUrl(row.drive_file_url) || (row.drive_file_id ? `https://drive.google.com/file/d/${encodeURIComponent(row.drive_file_id)}/view` : '');
+  const name = row.file_name || row.fileName || row.id || 'PWA photo';
+  return {
+    id: String(row.id || `${name}-${row.captured_at || ''}`),
+    name,
+    url: row.drive_file_url || '',
+    driveUrl,
+    flagged: signal.flagged,
+    pods: signal.pods,
+    cloud: true,
+    aiStatus: row.ai_status || 'not_started',
+    areaId: row.area_id || null,
+    treeNumber: row.confirmed_tree_id || row.tree_number || row.candidate_tree_ids?.[0] || null,
+    capturedAt: row.captured_at || null,
+    lat: Number.isFinite(lat) ? lat : null,
+    lon: Number.isFinite(lon) ? lon : null,
+    signalType: signal.type
+  };
+}
+
+function remoteTreeIds(row) {
+  const ids = [row.confirmed_tree_id, row.tree_number, ...(Array.isArray(row.candidate_tree_ids) ? row.candidate_tree_ids : [])];
+  return ids.filter(Boolean).map((id) => String(id).toLowerCase());
+}
+
+function findRemoteTree(merged, row, photo) {
+  const ids = remoteTreeIds(row);
+  const byId = merged.trees.find((tree) => ids.some((id) => tree.label.toLowerCase().includes(id)));
+  if (byId) return byId;
+  if (!Number.isFinite(photo.lat) || !Number.isFinite(photo.lon)) return null;
+  return merged.trees.map((tree) => ({ tree, distance:distanceMeters(photo.lat, photo.lon, tree.lat, tree.lon) })).sort((a, b) => a.distance - b.distance)[0]?.distance <= 12
+    ? merged.trees.map((tree) => ({ tree, distance:distanceMeters(photo.lat, photo.lon, tree.lat, tree.lon) })).sort((a, b) => a.distance - b.distance)[0].tree
+    : null;
+}
+
+function mergeCloudPhotos(baseHistory, rows) {
+  const merged = {
+    ...baseHistory,
+    trees: baseHistory.trees.map((tree) => ({ ...tree, photos:[...(tree.photos || [])], flagged:{ ...(tree.flagged || {}) } })),
+    diseaseTypeCounts:{ ...(baseHistory.diseaseTypeCounts || {}) }
+  };
+  const known = new Set(merged.trees.flatMap((tree) => (tree.photos || []).map((photo) => String(photo.id || photo.name || ''))));
+  (rows || []).forEach((row) => {
+    const photo = remotePhotoRecord(row);
+    if (known.has(photo.id) || [...known].some((id) => id && id === photo.name)) return;
+    known.add(photo.id);
+    let tree = findRemoteTree(merged, row, photo);
+    if (!tree) {
+      const treeLabel = photo.treeNumber ? `Tree ${photo.treeNumber}` : `PWA upload ${photo.name}`;
+      tree = { label:treeLabel, lat:photo.lat ?? mapBounds.south, lon:photo.lon ?? mapBounds.west, pods:0, flagged:{}, photos:[] };
+      merged.trees.push(tree);
+    }
+    tree.photos.push({ ...photo, flagged:photo.flagged, pods:photo.pods });
+    tree.pods += photo.pods;
+    if (photo.signalType && photo.flagged) {
+      tree.flagged[photo.signalType] = (tree.flagged[photo.signalType] || 0) + photo.flagged;
+      merged.diseaseTypeCounts[photo.signalType] = (merged.diseaseTypeCounts[photo.signalType] || 0) + photo.flagged;
+    }
+    merged.totalPhotos += 1;
+    if (photo.flagged) merged.diseasedPhotos += 1;
+  });
+  return merged;
+}
+
+function normalizeCloudAction(row) {
+  const target = row.tree_id ? `Tree ${row.tree_id}` : row.area_id ? `Area ${row.area_id}` : 'Farm action';
+  return { id:row.id, target, treatment:row.action_type || 'Field action', actionDate:(row.performed_at || '').slice(0, 10), recheckDate:(row.next_check_at || '').slice(0, 10) || 'Not scheduled', note:row.note || '', source:'cloud', photoId:row.photo_id || null };
+}
+
+function setCloudStatus(label, tone = 'neutral') {
+  const status = $('cloud-status');
+  if (!status) return;
+  status.textContent = label;
+  status.dataset.tone = tone;
 }
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
@@ -134,12 +228,14 @@ function initFarmMap() {
   mapLayerGroups.areas = L.layerGroup().addTo(farmMap);
   mapLayerGroups.trees = L.layerGroup().addTo(farmMap);
   mapLayerGroups.young = L.layerGroup().addTo(farmMap);
+  mapLayerGroups.cloud = L.layerGroup().addTo(farmMap);
   mapLayerGroups.signals = L.layerGroup().addTo(farmMap);
   referenceContext = L.layerGroup();
   referenceOverlay = L.imageOverlay('./assets/valencia_1021_status.png', [[mapBounds.south, mapBounds.west], [mapBounds.north, mapBounds.east]], { opacity: 0.58, interactive: false });
   drawAreaLayer();
   drawTreeLayer();
   drawYoungLayer();
+  drawCloudPhotoLayer();
   drawSignalLayer();
   renderHeatmapControls();
   document.querySelectorAll('[data-map-layer]').forEach((button) => button.addEventListener('click', () => toggleMapLayer(button.dataset.mapLayer, button)));
@@ -186,6 +282,23 @@ function drawYoungLayer() {
   });
 }
 
+function drawCloudPhotoLayer() {
+  if (!mapLayerGroups.cloud) return;
+  mapLayerGroups.cloud.clearLayers();
+  cloudSnapshot.photos.map(remotePhotoRecord).filter((photo) => Number.isFinite(photo.lat) && Number.isFinite(photo.lon)).forEach((photo) => {
+    const pending = photo.aiStatus === 'not_started' || photo.aiStatus === 'pending';
+    const marker = L.circleMarker([photo.lat, photo.lon], { radius:5.5, color:'#fff', weight:2, fillColor:pending ? '#2563eb' : photo.flagged ? '#b8443e' : '#4d9b6d', fillOpacity:.95 });
+    const source = photo.driveUrl ? `<a href="${escapeHtml(photo.driveUrl)}" target="_blank" rel="noopener">Open source photo</a>` : 'Drive source pending';
+    marker.bindPopup(mapPopup(escapeHtml(photo.name), [
+      pending ? 'PWA upload · AI screening pending' : `PWA upload · ${photo.flagged} flagged`,
+      `${escapeHtml(photo.areaId || 'Area not selected')} · ${escapeHtml(photo.treeNumber || 'Tree not confirmed')}`,
+      `${photo.lat.toFixed(6)}, ${photo.lon.toFixed(6)}`,
+      source
+    ]), { autoPan:false });
+    marker.bindTooltip(`${escapeHtml(photo.name)}<br>${pending ? 'AI screening pending' : 'Synced PWA result'}`, { direction:'top' }).addTo(mapLayerGroups.cloud);
+  });
+}
+
 function drawSignalLayer() {
   if (!mapLayerGroups.signals) return;
   mapLayerGroups.signals.clearLayers();
@@ -202,7 +315,7 @@ function drawSignalLayer() {
     marker.on('click', () => openTree(index));
     marker.addTo(mapLayerGroups.signals);
   });
-  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${youngTreeCandidates.length} young candidates · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${youngTreeCandidates.length} young candidates · ${cloudSnapshot.photos.length} PWA uploads · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
 }
 
 function renderHeatmapControls() {
@@ -291,7 +404,7 @@ function renderActionLog() {
     return;
   }
   const scanKeys = scanOptions.filter((option) => option.key !== 'all');
-  target.innerHTML = fieldActions.map((action) => { const outcome = scanKeys.length >= 2 ? actionOutcome(action, scanKeys[0].key, scanKeys[scanKeys.length - 1].key) : null; const result = outcome ? `<div class="action-result"><span>Observed after recheck</span><strong>${outcome.delta <= 0 ? '↓' : '↑'} ${Math.abs(Math.round(outcome.delta * 100))} pts</strong><small>${fmtPercent(outcome.beforeRate)} → ${fmtPercent(outcome.afterRate)} flagged-photo rate</small></div>` : '<div class="action-result pending"><span>Outcome</span><strong>Awaiting linked recheck</strong><small>Need matching Tree/Area records and both scan dates</small></div>'; return `<article class="action-row"><div class="action-row-head"><strong>${action.target}</strong><span class="status-badge neutral">Local draft</span></div><p>${action.treatment}</p><small>${action.actionDate} · Recheck ${action.recheckDate}</small>${action.note ? `<em>${action.note}</em>` : ''}${result}</article>`; }).join('');
+  target.innerHTML = fieldActions.map((action) => { const outcome = scanKeys.length >= 2 ? actionOutcome(action, scanKeys[0].key, scanKeys[scanKeys.length - 1].key) : null; const result = outcome ? `<div class="action-result"><span>Observed after recheck</span><strong>${outcome.delta <= 0 ? '↓' : '↑'} ${Math.abs(Math.round(outcome.delta * 100))} pts</strong><small>${fmtPercent(outcome.beforeRate)} → ${fmtPercent(outcome.afterRate)} flagged-photo rate</small></div>` : '<div class="action-result pending"><span>Outcome</span><strong>Awaiting linked recheck</strong><small>Need matching Tree/Area records and both scan dates</small></div>'; const sourceLabel = action.source === 'cloud' ? 'Synced from PWA' : 'Local draft'; return `<article class="action-row"><div class="action-row-head"><strong>${escapeHtml(action.target)}</strong><span class="status-badge neutral">${sourceLabel}</span></div><p>${escapeHtml(action.treatment)}</p><small>${escapeHtml(action.actionDate)} · Recheck ${escapeHtml(action.recheckDate)}</small>${action.note ? `<em>${escapeHtml(action.note)}</em>` : ''}${result}</article>`; }).join('');
 }
 
 function toggleMapLayer(layer, button) {
@@ -307,6 +420,7 @@ function renderMap() {
   if (farmMap) {
     drawTreeLayer();
     drawYoungLayer();
+    drawCloudPhotoLayer();
     drawSignalLayer();
     renderHeatmapControls();
     setTimeout(() => farmMap.invalidateSize(), 50);
@@ -354,9 +468,9 @@ function openTree(index) {
 }
 
 function renderPhotos(filter = 'all') {
-  const records = history.trees.flatMap((tree) => (tree.photos || []).filter((photo) => photo.flagged || photo.pods).map((photo) => ({ ...photo, tree, area: areaForTree(tree), signals: Object.keys(tree.flagged || {}) }))).filter((record) => filter === 'all' || record.signals.includes(filter)).sort((a,b) => (b.flagged - a.flagged) || (b.pods - a.pods)).slice(0, 18);
+  const records = history.trees.flatMap((tree) => (tree.photos || []).filter((photo) => photo.flagged || photo.pods || photo.cloud).map((photo) => ({ ...photo, tree, area: photo.areaId || areaForTree(tree), signals: photo.signalType ? [photo.signalType] : Object.keys(tree.flagged || {}) }))).filter((record) => filter === 'all' || record.signals.includes(filter)).sort((a,b) => (b.flagged - a.flagged) || (b.pods - a.pods)).slice(0, 18);
   $('photo-count-label').textContent = history.totalPhotos;
-  $('photo-review-grid').innerHTML = records.map((record) => `<article class="photo-card"><h3>${record.name}</h3><p>${record.tree.label} · Area ${record.area}</p><div class="tag-row"><span class="tag ${record.flagged ? 'alert' : ''}">${record.flagged ? `${record.flagged} flagged` : 'No flagged pod'}</span><span class="tag">${record.pods} pod${record.pods === 1 ? '' : 's'}</span><span class="tag">Drive source</span></div><button class="small-button photo-open" data-tree-index="${history.trees.indexOf(record.tree)}" type="button">Open tree record →</button></article>`).join('');
+  $('photo-review-grid').innerHTML = records.map((record) => { const pending = record.cloud && !record.flagged && !record.pods; const sourceLink = record.driveUrl ? `<a class="small-button photo-source" href="${escapeHtml(record.driveUrl)}" target="_blank" rel="noopener">Open source photo ↗</a>` : ''; return `<article class="photo-card"><h3>${escapeHtml(record.name)}</h3><p>${escapeHtml(record.tree.label)} · Area ${escapeHtml(record.area)}</p><div class="tag-row"><span class="tag ${record.flagged ? 'alert' : ''}">${record.flagged ? `${record.flagged} flagged` : pending ? 'Awaiting AI screening' : 'No flagged pod'}</span><span class="tag">${record.pods} pod${record.pods === 1 ? '' : 's'}</span><span class="tag">${record.cloud ? 'Synced from PWA' : 'Historical snapshot'}</span></div><div class="photo-card-actions">${sourceLink}<button class="small-button photo-open" data-tree-index="${history.trees.indexOf(record.tree)}" type="button">Open tree record →</button></div></article>`; }).join('');
   document.querySelectorAll('.photo-open').forEach((button) => button.addEventListener('click', () => openTree(Number(button.dataset.treeIndex))));
 }
 
@@ -371,10 +485,22 @@ function openArea(area) { showToast(`Area ${area} selected. Opening the area wor
 function openView(view) { currentView = view; document.querySelectorAll('.view').forEach((section) => section.classList.toggle('active', section.id === `view-${view}`)); document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === view)); $('page-title').textContent = ({ overview:'Farm dashboard', areas:'Areas', trees:'Tree records', photos:'Photo review', actions:'Field actions', report:'Weekly report' })[view]; window.scrollTo({ top:0, behavior:'smooth' }); }
 
 async function loadData() {
+  setCloudStatus('LOADING CLOUD…', 'neutral');
   const response = await fetch('../cacaoai-pwa/data/valencia-tree-history-20261104.json');
   if (!response.ok) throw new Error(`Data load failed (${response.status})`);
-  history = await response.json();
-  fieldActions = loadFieldActions();
+  const baseHistory = await response.json();
+  try {
+    cloudSnapshot = await window.cacaoaiCloud.loadSnapshot();
+    history = mergeCloudPhotos(baseHistory, cloudSnapshot.photos);
+    fieldActions = [...cloudSnapshot.actions.map(normalizeCloudAction), ...loadFieldActions()];
+    setCloudStatus(`${cloudSnapshot.photos.length} PWA UPLOADS${cloudSnapshot.status === 'partial' ? ' · PARTIAL' : ''}`, cloudSnapshot.status === 'partial' ? 'warning' : 'connected');
+  } catch (error) {
+    cloudSnapshot = { photos:[], actions:[], status:'fallback', error:error.message };
+    history = baseHistory;
+    fieldActions = loadFieldActions();
+    setCloudStatus('STATIC FALLBACK', 'warning');
+    console.warn('Cloud snapshot unavailable; using local historical data.', error);
+  }
   scanOptions = buildScanOptions();
   renderScanTimeline(); renderMetrics(); renderMap(); renderPriority(); renderSignals('signal-list'); renderAreas(); renderTrees(); renderPhotos(); renderReport(); renderEffectiveness(); renderActionLog();
 }
@@ -382,7 +508,7 @@ async function loadData() {
 document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => openView(button.dataset.view)));
 $('tree-search').addEventListener('input', (event) => renderTrees(event.target.value));
 $('photo-filter').addEventListener('change', (event) => renderPhotos(event.target.value));
-$('refresh-data').addEventListener('click', async () => { try { await loadData(); showToast('Valencia snapshot refreshed.'); } catch (error) { showToast(error.message); } });
+$('refresh-data').addEventListener('click', async () => { try { await loadData(); showToast(cloudSnapshot.status === 'connected' ? 'Cloud data refreshed.' : 'Historical snapshot refreshed.'); } catch (error) { setCloudStatus('LOAD ERROR', 'warning'); showToast(error.message); } });
 $('new-action').addEventListener('click', () => { openView('actions'); setTimeout(() => $('action-target').focus(), 50); });
 $('action-form').addEventListener('submit', (event) => { event.preventDefault(); fieldActions.unshift({ id: Date.now(), target: $('action-target').value.trim(), treatment: $('action-treatment').value.trim(), actionDate: $('action-date').value, recheckDate: $('action-recheck').value, note: $('action-note').value.trim() }); saveFieldActions(); renderActionLog(); renderEffectiveness(); event.target.reset(); showToast('Field action saved locally.'); });
 $('download-report').addEventListener('click', () => { const lines = [`Valencia DA Pilot Farm — scan ${history.scanDate}`, `Scanned photos: ${history.totalPhotos}`, `Disease signals: ${history.diseasedPhotos}`, `Tree records: ${history.trees.length}`, ...Object.entries(history.diseaseTypeCounts).map(([key, value]) => `${signalNames[key] || key}: ${value}`)]; const blob = new Blob([lines.join('\n')], { type:'text/plain' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'valencia-cacao-weekly-summary.txt'; link.click(); URL.revokeObjectURL(link.href); });
