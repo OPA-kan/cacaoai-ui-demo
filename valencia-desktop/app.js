@@ -31,6 +31,11 @@ let scanSelection = 'all';
 let scanOptions = [];
 let fieldActions = [];
 let treeCoverage = { linked:0, noScan:0 };
+let treePositionEstimates = {};
+let analysisSnapshot = { status:'not-run', photo_links:[], tree_records:[], position_estimates:[], sessions:[] };
+let weatherSnapshot = { status:'not-loaded', daily:[], summary:null };
+let harvestRecords = [];
+let marketPrices = { local:[], international:[] };
 const registeredTreePoints = window.valenciaRegisteredTrees || [];
 const youngTreeCandidates = window.valenciaYoungTreeCandidates || [];
 let cloudSnapshot = { photos:[], actions:[], status:'not-loaded', error:null };
@@ -98,23 +103,101 @@ function remotePhotoRecord(row) {
     cloud: true,
     aiStatus: row.ai_status || 'not_started',
     areaId: row.area_id || null,
-    treeNumber: row.confirmed_tree_id || row.tree_number || row.candidate_tree_ids?.[0] || null,
+    confirmedTreeId: row.confirmed_tree_id || null,
+    treeNumber: row.tree_number || row.confirmed_tree_id || row.candidate_tree_ids?.[0] || null,
     capturedAt: row.captured_at || null,
+    gpsAccuracy: Number.isFinite(Number(row.gps_accuracy)) ? Number(row.gps_accuracy) : null,
     lat: Number.isFinite(lat) ? lat : null,
     lon: Number.isFinite(lon) ? lon : null,
     signalType: signal.type
   };
 }
 
+function dateOnly(value) {
+  const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function shiftDate(dateValue, days) {
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function reportEndDate() {
+  const cloudDates = (cloudSnapshot.photos || []).map((row) => dateOnly(row.captured_at || row.capturedAt)).filter(Boolean);
+  const candidates = [...cloudDates, dateOnly(history?.scanDate)].filter(Boolean).sort();
+  return candidates[candidates.length - 1] || new Date().toISOString().slice(0, 10);
+}
+
+function normalizeHarvestRecord(row) {
+  const rawWeight = row.weight_kg ?? row.weightKg ?? row.quantity_kg ?? row.quantity;
+  const weight = rawWeight === null || rawWeight === undefined || rawWeight === '' ? null : Number(rawWeight);
+  const rawPods = row.pods ?? row.pod_count ?? row.podCount;
+  const pods = rawPods === null || rawPods === undefined || rawPods === '' ? null : Number(rawPods);
+  return {
+    id: row.id || `${row.harvest_date || row.date}-${row.tree_id || row.area_id || 'farm'}`,
+    date: dateOnly(row.harvest_date || row.harvestDate || row.date),
+    weightKg: Number.isFinite(weight) ? weight : null,
+    pods: Number.isFinite(pods) ? pods : null,
+    treeId: row.tree_id || row.treeId || null,
+    areaId: row.area_id || row.areaId || null,
+    grade: row.grade || row.quality_grade || null,
+    source: row.source || 'Supabase harvest record'
+  };
+}
+
+function loadHarvestDrafts() {
+  try { return JSON.parse(localStorage.getItem('cacaoai.valencia.harvestDrafts') || '[]'); } catch { return []; }
+}
+
+function saveHarvestDrafts(records) {
+  localStorage.setItem('cacaoai.valencia.harvestDrafts', JSON.stringify(records));
+}
+
+function normalizeMarketPrice(row) {
+  const value = Number(row.value ?? row.price ?? row.amount);
+  return {
+    date: dateOnly(row.observed_on || row.observedOn || row.date),
+    value: Number.isFinite(value) ? value : null,
+    currency: row.currency || 'PHP',
+    unit: row.unit || 'kg',
+    source: row.source || 'Local market observation',
+    scope: String(row.market_scope || row.scope || 'local').toLowerCase()
+  };
+}
+
+function normalizeThreeDigitNumber(value) {
+  const match = String(value ?? '').trim().match(/^\d{3}$/);
+  return match ? match[1] : null;
+}
+
+function historicalTreeNumber(label) {
+  const match = String(label || '').match(/(?:番号|number|#)\s*([0-9]{3})/i);
+  return match ? match[1] : null;
+}
+
+function treeMatchesReportedId(tree, id) {
+  const raw = String(id ?? '').trim().toLowerCase();
+  if (!raw) return false;
+  if (raw === String(tree.treeId || '').trim().toLowerCase()) return true;
+  if (raw === String(tree.number || '').trim().toLowerCase()) return true;
+  const number = normalizeThreeDigitNumber(raw);
+  return number !== null && historicalTreeNumber(tree.label) === number;
+}
+
 function remoteTreeIds(row) {
   const ids = [row.confirmed_tree_id, row.tree_number, ...(Array.isArray(row.candidate_tree_ids) ? row.candidate_tree_ids : [])];
-  return ids.filter(Boolean).map((id) => String(id).toLowerCase());
+  return ids.filter(Boolean).map((id) => String(id).trim());
 }
 
 function findRemoteTree(merged, row, photo) {
   const ids = remoteTreeIds(row);
-  const byId = merged.trees.find((tree) => ids.some((id) => tree.label.toLowerCase().includes(id)));
+  const byId = merged.trees.find((tree) => ids.some((id) => treeMatchesReportedId(tree, id)));
   if (byId) return byId;
+  // An explicit tree number or candidate is evidence to review, not permission
+  // to silently attach the photo to the nearest historical tree.
+  if (ids.length) return null;
   if (!Number.isFinite(photo.lat) || !Number.isFinite(photo.lon)) return null;
   return merged.trees.map((tree) => ({ tree, distance:distanceMeters(photo.lat, photo.lon, tree.lat, tree.lon) })).sort((a, b) => a.distance - b.distance)[0]?.distance <= 12
     ? merged.trees.map((tree) => ({ tree, distance:distanceMeters(photo.lat, photo.lon, tree.lat, tree.lon) })).sort((a, b) => a.distance - b.distance)[0].tree
@@ -134,8 +217,8 @@ function mergeCloudPhotos(baseHistory, rows) {
     known.add(photo.id);
     let tree = findRemoteTree(merged, row, photo);
     if (!tree) {
-      const treeLabel = photo.treeNumber ? `Tree ${photo.treeNumber}` : `PWA upload ${photo.name}`;
-      tree = { label:treeLabel, lat:photo.lat ?? mapBounds.south, lon:photo.lon ?? mapBounds.west, pods:0, flagged:{}, photos:[] };
+      const treeLabel = photo.treeNumber ? `Tree ${photo.treeNumber} · reported number (unresolved)` : `PWA upload ${photo.name}`;
+      tree = { label:treeLabel, treeNumber:photo.treeNumber || null, lat:photo.lat ?? mapBounds.south, lon:photo.lon ?? mapBounds.west, pods:0, flagged:{}, photos:[] };
       merged.trees.push(tree);
     }
     tree.photos.push({ ...photo, flagged:photo.flagged, pods:photo.pods });
@@ -168,17 +251,145 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+function treePositionEstimate(tree) {
+  const normalize = window.cacaoaiPositionEstimator?.normalizeTreeId;
+  if (!normalize) return null;
+  return treePositionEstimates[normalize(tree.id || tree.number)] || null;
+}
+
+function analysisTreeRecord(tree) {
+  const normalize = window.cacaoaiPositionEstimator?.normalizeTreeId;
+  if (!normalize) return null;
+  const treeId = normalize(tree.id || tree.number);
+  return (analysisSnapshot.tree_records || []).find((record) => normalize(record.tree_id) === treeId) || null;
+}
+
+function analysisPhotoLink(photo) {
+  const photoId = String(photo?.id || '');
+  return (analysisSnapshot.photo_links || []).find((link) => String(link.photo_id) === photoId) || null;
+}
+
+function normalizeAnalysisEstimate(record) {
+  return {
+    treeId: record.tree_id,
+    latitude: Number(record.latitude),
+    longitude: Number(record.longitude),
+    uncertaintyM: Number(record.uncertainty_m ?? record.uncertaintyM ?? 0),
+    radius95M: Number(record.radius95_m ?? record.radius95M ?? 0),
+    spreadM: Number(record.spread_m ?? record.spreadM ?? 0),
+    shiftM: Number(record.shift_m ?? record.shiftM ?? 0),
+    confidenceScore: Number(record.confidence_score ?? record.confidenceScore ?? 0),
+    confidence: record.confidence || 'low',
+    observationCount: Number(record.observation_count ?? record.observationCount ?? 0),
+    photoIds: record.photo_ids || record.photoIds || [],
+    usesEstimatedPosition: Boolean(record.uses_estimated_position ?? record.usesEstimatedPosition),
+    source: record.source || 'local field pipeline'
+  };
+}
+
+function mergeLocalAnalysisEstimates() {
+  const normalize = window.cacaoaiPositionEstimator?.normalizeTreeId;
+  if (!normalize) return;
+  treePositionEstimates = {
+    ...treePositionEstimates,
+    ...(analysisSnapshot.position_estimates || []).reduce((result, record) => {
+      const estimate = normalizeAnalysisEstimate(record);
+      if (Number.isFinite(estimate.latitude) && Number.isFinite(estimate.longitude)) result[normalize(record.tree_id)] = estimate;
+      return result;
+    }, {})
+  };
+}
+
+function displayTreePosition(tree) {
+  const estimate = treePositionEstimate(tree);
+  return estimate?.usesEstimatedPosition
+    ? { lat: estimate.latitude, lng: estimate.longitude }
+    : tree.position;
+}
+
+function positionSummary(estimate) {
+  if (!estimate) return 'Registry position · no confirmed PWA GPS observation';
+  const score = Number.isFinite(estimate.confidenceScore) ? `${Math.round(estimate.confidenceScore * 100)}% model score` : 'model score unavailable';
+  const radius = Number.isFinite(estimate.radius95M) ? ` · 95% radius ±${estimate.radius95M.toFixed(1)}m` : '';
+  const source = estimate.source?.includes('field-pipeline') ? ' · confirmed visits, M1 bias removed' : '';
+  return `${estimate.confidence} (${score}) · ${estimate.observationCount} linked PWA photo${estimate.observationCount === 1 ? '' : 's'}${radius}${source}`;
+}
+
+function rebuildTreePositionEstimates() {
+  const estimator = window.cacaoaiPositionEstimator;
+  treePositionEstimates = estimator
+    ? estimator.estimateTreePositions((cloudSnapshot.photos || []).map(remotePhotoRecord), registeredTreePoints)
+    : {};
+}
+
+async function runLocalAnalysis() {
+  analysisSnapshot = { status:'unavailable', reason:'local analysis service not started', photo_links:[], tree_records:[], position_estimates:[], sessions:[] };
+  const bridge = window.cacaoaiLocalAnalysis;
+  if (!bridge?.analyze) return;
+  const config = window.cacaoaiDesktopConfig || {};
+  try {
+    const historicalNumbers = [...new Set((history?.trees || []).map((tree) => historicalTreeNumber(tree.label)).filter(Boolean))];
+    analysisSnapshot = await bridge.analyze({
+      farm_id: config.farmId || 'sample-farm',
+      trees: registeredTreePoints.map((tree) => ({ id:tree.id, number:tree.number, areaId:tree.areaId, lat:tree.position.lat, lon:tree.position.lng })),
+      photos: cloudSnapshot.photos || [],
+      tag_map: window.valenciaTagMap || [],  // tag number -> registry tree, maintained by the administrator
+      historical_numbers: [...new Set([...(window.valenciaHistoricalNumbers || []), ...historicalNumbers])],
+      options: { session_gap_seconds:900, burst_gap_seconds:6, spacing_m:3, m3_min_groups:6, m3_max_shapes:12, suspect_max_probability:0.01 }
+    });
+    mergeLocalAnalysisEstimates();
+  } catch (error) {
+    console.warn('Local field analysis unavailable; browser estimator remains active.', error);
+  }
+}
+
+async function loadExternalContext() {
+  const config = window.cacaoaiDesktopConfig || {};
+  const location = config.farmLocation || { latitude:9.262, longitude:123.218, timezone:'Asia/Manila' };
+  const endDate = reportEndDate();
+  const startDate = shiftDate(endDate, -6);
+  const harvestSources = [
+    ...(cloudSnapshot.harvestRecords || []).map(normalizeHarvestRecord),
+    ...loadHarvestDrafts().map(normalizeHarvestRecord),
+    ...(window.cacaoaiBuiltInHarvestRecords || []).map(normalizeHarvestRecord)
+  ];
+  const seenHarvestKeys = new Set();
+  harvestRecords = harvestSources.filter((record) => {
+    if (!record.date || (record.weightKg !== null && record.weightKg < 0)) return false;
+    const key = `${record.date}|${record.treeId || record.areaId || 'farm'}`;
+    if (seenHarvestKeys.has(key)) return false;
+    seenHarvestKeys.add(key);
+    return true;
+  });
+  const cloudPrices = (cloudSnapshot.marketPrices || []).map(normalizeMarketPrice).filter((record) => record.date && record.value !== null);
+  marketPrices = {
+    local: cloudPrices.filter((record) => record.scope !== 'international'),
+    international: []
+  };
+  weatherSnapshot = { status:'unavailable', daily:[], summary:null, start_date:startDate, end_date:endDate };
+  const bridge = window.cacaoaiLocalAnalysis;
+  if (!bridge?.weather || !bridge?.marketPrices) return;
+  const [weatherResult, marketResult] = await Promise.allSettled([
+    bridge.weather({ latitude:location.latitude, longitude:location.longitude, startDate, endDate, timezone:location.timezone }),
+    bridge.marketPrices({ startDate:shiftDate(endDate, -(Number(config.marketPriceMonths) || 24) * 31), endDate })
+  ]);
+  if (weatherResult.status === 'fulfilled') weatherSnapshot = weatherResult.value;
+  else weatherSnapshot = { ...weatherSnapshot, status:'error', error:weatherResult.reason?.message || 'Weather unavailable' };
+  if (marketResult.status === 'fulfilled') marketPrices.international = marketResult.value.series || [];
+}
+
 function nearestRegisteredTree(tree) {
   return registeredTreePoints.map((candidate) => ({ candidate, distance: distanceMeters(tree.lat, tree.lon, candidate.position.lat, candidate.position.lng) })).sort((a, b) => a.distance - b.distance)[0] || null;
 }
 
 function registeredTreeStatus(tree) {
-  const match = history.trees.map((candidate) => ({ candidate, distance: distanceMeters(tree.position.lat, tree.position.lng, candidate.lat, candidate.lon) })).sort((a, b) => a.distance - b.distance)[0];
+  const position = displayTreePosition(tree);
+  const match = history.trees.map((candidate) => ({ candidate, distance: distanceMeters(position.lat, position.lng, candidate.lat, candidate.lon) })).sort((a, b) => a.distance - b.distance)[0];
   if (!match || match.distance > 12 || !scanPhotos(match.candidate, scanSelection).length) return { key:'none', label:'No linked scan' };
   const signals = treeSignalCount(match.candidate, scanSelection, scanSelection === 'all' ? heatmapFilter : 'all');
   const rate = signals / scanPhotos(match.candidate, scanSelection).length;
   const key = priorityClass(rate);
-  return { key, label:key === 'high' ? 'Priority' : key === 'medium' ? 'Follow-up' : 'Low signal', signals, distance:match.distance, source:match.candidate };
+  return { key, label:key === 'high' ? 'Priority' : key === 'medium' ? 'Follow-up' : 'Low signal', signals, distance:match.distance, source:match.candidate, positionEstimate:treePositionEstimate(tree) };
 }
 
 function areaForTree(tree) {
@@ -262,8 +473,16 @@ function drawTreeLayer() {
     const status = registeredTreeStatus(tree);
     if (status.key === 'none') treeCoverage.noScan += 1; else treeCoverage.linked += 1;
     const fillColor = status.key === 'high' ? '#b8443e' : status.key === 'medium' ? '#d79027' : status.key === 'low' ? '#4d9b6d' : '#9ba9a2';
+    const estimate = treePositionEstimate(tree);
+    const position = displayTreePosition(tree);
     const details = status.key === 'none' ? 'No linked scan yet' : `${status.label} · ${status.signals} signals · ${Math.round(status.distance)}m from scan GPS`;
-    L.circleMarker([tree.position.lat, tree.position.lng], { radius:4.5, color:'#fff', weight:1.5, fillColor, fillOpacity:.98 }).bindTooltip(`Tree ${tree.number}<br>${details}`, { direction:'top' }).addTo(mapLayerGroups.trees);
+    const positionLine = `Position: ${positionSummary(estimate)}${estimate?.usesEstimatedPosition ? ' · map updated' : ''}`;
+    const linkage = analysisTreeRecord(tree);
+    const linkageLine = linkage ? `Local model: ${linkage.photo_count} photo${linkage.photo_count === 1 ? '' : 's'} linked · ${Math.round(linkage.mean_assignment_confidence * 100)}% mean assignment confidence` : 'Local model: no linked PWA photo';
+    L.circleMarker([position.lat, position.lng], { radius:4.5, color:'#fff', weight:1.5, fillColor, fillOpacity:.98 })
+      .bindTooltip(`Tree ${tree.number}<br>${details}<br>${linkageLine}<br>${positionLine}`, { direction:'top' })
+      .bindPopup(mapPopup(`Tree ${escapeHtml(tree.number)}`, [details, linkageLine, positionLine, `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}`]), { autoPan:false })
+      .addTo(mapLayerGroups.trees);
   });
 }
 
@@ -292,11 +511,26 @@ function drawCloudPhotoLayer() {
     marker.bindPopup(mapPopup(escapeHtml(photo.name), [
       pending ? 'PWA upload · AI screening pending' : `PWA upload · ${photo.flagged} flagged`,
       `${escapeHtml(photo.areaId || 'Area not selected')} · ${escapeHtml(photo.treeNumber || 'Tree not confirmed')}`,
+      photo.confirmedTreeId ? `Confirmed tree ID · GPS ±${photo.gpsAccuracy ? `${Math.round(photo.gpsAccuracy)}m` : 'unknown'}` : 'Tree ID not confirmed',
+      analysisLinkLine(analysisPhotoLink(photo)),
       `${photo.lat.toFixed(6)}, ${photo.lon.toFixed(6)}`,
       source
     ]), { autoPan:false });
-    marker.bindTooltip(`${escapeHtml(photo.name)}<br>${pending ? 'AI screening pending' : 'Synced PWA result'}`, { direction:'top' }).addTo(mapLayerGroups.cloud);
+    const linkage = analysisPhotoLink(photo);
+    if (linkage?.id_check === 'suspect') marker.setStyle({ color:'#d97706', weight:3 });
+    marker.bindTooltip(`${escapeHtml(photo.name)}<br>${pending ? 'AI screening pending' : 'Synced PWA result'}<br>${analysisLinkLine(linkage)}`, { direction:'top' }).addTo(mapLayerGroups.cloud);
   });
+}
+
+// One line per photo: a confirmed ID and whether its GPS agrees, or a model link for an unconfirmed photo.
+function analysisLinkLine(link) {
+  if (!link) return 'Local model link pending';
+  if (link.source === 'confirmed') {
+    if (link.id_check === 'suspect') return `⚠ Check tag: confirmed ${escapeHtml(link.tree_id)}, but GPS points to ${escapeHtml(link.model_tree_id || '?')}`;
+    return `Confirmed ${escapeHtml(link.tree_id)} · GPS check ${link.consistent_with_confirmed_id ? 'agrees' : 'inconclusive'}`;
+  }
+  if (link.model_source === 'number_match') return `Tag ${escapeHtml(link.reported_number || '?')} not in the tag table · probably ${escapeHtml(link.tree_id)} (${Math.round(link.confidence * 100)}%) · ${link.record_status === 'historical_number_only' ? 'known from older records' : 'needs review'}`;
+  return `Model link · Tree ${escapeHtml(link.tree_id)} · ${Math.round(link.confidence * 100)}%${link.confidence_calibrated ? ' (calibrated)' : ' (uncalibrated)'}`;
 }
 
 function drawSignalLayer() {
@@ -315,7 +549,12 @@ function drawSignalLayer() {
     marker.on('click', () => openTree(index));
     marker.addTo(mapLayerGroups.signals);
   });
-  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${youngTreeCandidates.length} young candidates · ${cloudSnapshot.photos.length} PWA uploads · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
+  const estimatedCount = Object.values(treePositionEstimates).filter((estimate) => estimate.usesEstimatedPosition).length;
+  const linkedByModel = (analysisSnapshot.tree_records || []).filter((record) => record.photo_count > 0).length;
+  const evaluation = analysisSnapshot.evaluation;
+  const evaluationLabel = evaluation?.status === 'ok' ? ` · GPS recovers ${Math.round(evaluation.accuracy * 100)}% of hidden tree IDs (${evaluation.visits} visits) · ${evaluation.suspect_confirmed_visits} tag reads to check` : '';
+  const analysisLabel = analysisSnapshot.status === 'ok' ? ` · ${linkedByModel} trees with photos${evaluationLabel}` : ` · field model ${analysisSnapshot.status}`;
+  $('map-status').textContent = `${registeredTreePoints.length} registered trees · ${youngTreeCandidates.length} young candidates · ${cloudSnapshot.photos.length} PWA uploads · ${estimatedCount} positions updated from GPS · ${linkedByModel} model-linked trees${analysisLabel} · ${treeCoverage.linked} linked · ${treeCoverage.noScan} no linked scan · ${history.trees.length} GPS signal groups · ${scanSelection === 'all' ? 'all scans' : scanDateLabel(scanSelection)} · ${disease === 'all' ? 'all signals' : signalNames[disease]} heatmap`;
 }
 
 function renderHeatmapControls() {
@@ -435,10 +674,131 @@ function renderPriority() {
   $('next-step').textContent = areas[0] ? `Visit Area ${areas[0].id} first and confirm the highest-signal tree groups in person.` : 'No priority area has been calculated yet.';
 }
 
+function aggregateSeries(records, dateKey, valueKey) {
+  const values = new Map();
+  (records || []).forEach((record) => {
+    const date = dateOnly(record[dateKey] || record.date);
+    const rawValue = record[valueKey] ?? record.value;
+    const value = rawValue === null || rawValue === undefined || rawValue === '' ? null : Number(rawValue);
+    if (!date || !Number.isFinite(value)) return;
+    values.set(date, (values.get(date) || 0) + value);
+  });
+  return [...values.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value }));
+}
+
+function indexPriceSeries(points) {
+  const usable = (points || []).filter((point) => Number.isFinite(Number(point.value)) && Number(point.value) > 0);
+  if (!usable.length) return [];
+  const base = Number(usable[0].value);
+  return usable.map((point) => ({ date:point.date, value:Number(point.value) / base * 100 }));
+}
+
+function renderSvgChart(targetId, series, { emptyText = 'No records yet', unit = '' } = {}) {
+  const target = $(targetId);
+  if (!target) return;
+  const validSeries = (series || []).map((item) => ({ ...item, points:(item.points || []).filter((point) => Number.isFinite(Number(point.value))) })).filter((item) => item.points.length);
+  if (!validSeries.length) {
+    target.innerHTML = `<div class="chart-empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  const dates = [...new Set(validSeries.flatMap((item) => item.points.map((point) => point.date)))].sort();
+  const values = validSeries.flatMap((item) => item.points.map((point) => Number(point.value)));
+  let min = Math.min(...values), max = Math.max(...values);
+  if (min === max) { min -= 1; max += 1; }
+  const width = 760, height = 180, left = 36, right = 12, top = 12, bottom = 28;
+  const plotWidth = width - left - right, plotHeight = height - top - bottom;
+  const x = (index) => left + (dates.length <= 1 ? plotWidth / 2 : index / (dates.length - 1) * plotWidth);
+  const y = (value) => top + (max - value) / (max - min) * plotHeight;
+  const dateLabel = (value) => value?.slice(5) || '';
+  const grid = [0, .5, 1].map((ratio) => { const value = max - (max - min) * ratio; const yy = top + plotHeight * ratio; return `<line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${yy}" y2="${yy}"/><text class="chart-axis-label" x="2" y="${yy + 3}">${value.toFixed(1)}${escapeHtml(unit)}</text>`; }).join('');
+  const xLabels = dates.length <= 1 ? `<text class="chart-axis-label" x="${x(0)}" y="${height - 7}" text-anchor="middle">${dateLabel(dates[0])}</text>` : [dates[0], dates[Math.floor((dates.length - 1) / 2)], dates[dates.length - 1]].map((date, index, labels) => `<text class="chart-axis-label" x="${x(dates.indexOf(date))}" y="${height - 7}" text-anchor="${index === 0 ? 'start' : index === labels.length - 1 ? 'end' : 'middle'}">${dateLabel(date)}</text>`).join('');
+  const lines = validSeries.map((item) => {
+    const valuesByDate = new Map(item.points.map((point) => [point.date, Number(point.value)]));
+    const points = dates.filter((date) => valuesByDate.has(date)).map((date) => `${x(dates.indexOf(date))},${y(valuesByDate.get(date))}`).join(' ');
+    const dots = dates.filter((date) => valuesByDate.has(date)).map((date) => `<circle class="chart-dot" cx="${x(dates.indexOf(date))}" cy="${y(valuesByDate.get(date))}" r="3" fill="${item.color}"/>`).join('');
+    return `<polyline class="chart-line" stroke="${item.color}" points="${points}"/>${dots}`;
+  }).join('');
+  const legend = validSeries.map((item) => `<span><i style="background:${item.color}"></i>${escapeHtml(item.label)}</span>`).join('');
+  target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Trend chart">${grid}${lines}${xLabels}</svg><div class="chart-legend">${legend}</div>`;
+}
+
+function renderStatisticsDashboard() {
+  const status = $('statistics-status');
+  const weatherSummary = weatherSnapshot.summary || {};
+  const harvestSeries = aggregateSeries(harvestRecords, 'date', 'weightKg');
+  const localPriceSeries = marketPrices.local.filter((point) => point.value !== null).sort((a, b) => a.date.localeCompare(b.date));
+  const internationalSeries = (marketPrices.international || []).filter((point) => Number.isFinite(Number(point.value))).sort((a, b) => a.date.localeCompare(b.date));
+  const harvestTotal = harvestRecords.reduce((sum, record) => sum + (Number(record.weightKg) || 0), 0);
+  const harvestPods = harvestRecords.reduce((sum, record) => sum + (Number(record.pods) || 0), 0);
+  const latestLocal = localPriceSeries.at(-1);
+  const latestInternational = internationalSeries.at(-1);
+  const formatPrice = (point) => point ? `${point.currency === 'PHP' ? '₱' : '$'}${Number(point.value).toLocaleString(undefined, { maximumFractionDigits:2 })}/${point.unit || 'kg'}` : '—';
+  const weatherReady = weatherSnapshot.status === 'ok';
+  const pricesReady = internationalSeries.length || localPriceSeries.length;
+  status.textContent = weatherReady ? `Weather ${weatherSnapshot.start_date} → ${weatherSnapshot.end_date}` : 'Weather unavailable';
+  status.className = `status-badge ${weatherReady ? 'neutral' : 'priority'}`;
+  $('stats-kpis').innerHTML = `<div class="stats-kpi"><span>Rainfall</span><strong>${weatherReady ? `${weatherSummary.total_precipitation_mm ?? '—'} mm` : '—'}</strong><small>${weatherSummary.rainy_days ?? '—'} rainy days</small></div><div class="stats-kpi"><span>Average humidity</span><strong>${weatherSummary.average_humidity_pct ?? '—'}${weatherReady ? '%' : ''}</strong><small>${weatherSummary.average_temperature_c ?? '—'}°C average</small></div><div class="stats-kpi"><span>Recorded harvest</span><strong>${harvestTotal ? `${harvestTotal.toFixed(1)} kg` : '—'}</strong><small>${harvestRecords.length} records · ${harvestPods ? `${harvestPods.toLocaleString()} pods` : 'pods —'}</small></div><div class="stats-kpi"><span>Latest prices</span><strong>${formatPrice(latestLocal)}</strong><small>International: ${formatPrice(latestInternational)}</small></div>`;
+  $('weather-period').textContent = weatherReady ? `${weatherSnapshot.start_date} → ${weatherSnapshot.end_date}` : 'No weather data';
+  $('harvest-period').textContent = harvestSeries.length ? `${harvestSeries[0].date} → ${harvestSeries.at(-1).date}` : 'No production data';
+  const priceDates = [...localPriceSeries, ...internationalSeries].map((point) => point.date).sort();
+  $('price-period').textContent = priceDates.length ? `${priceDates[0]} → ${priceDates.at(-1)} · indexed` : 'No price data';
+  renderSvgChart('weather-chart', [{ label:'Precipitation (mm)', color:'#3a73a4', points:(weatherSnapshot.daily || []).map((row) => ({ date:row.date, value:Number(row.precipitation_mm) || 0 })) }], { emptyText:'Weather data will appear when the local server can reach Open-Meteo', unit:' mm' });
+  renderSvgChart('harvest-chart', [{ label:'Harvest (kg)', color:'#b97819', points:harvestSeries }], { emptyText:'No harvest records yet', unit:' kg' });
+  renderSvgChart('price-chart', [
+    { label:'Local market', color:'#b97819', points:indexPriceSeries(localPriceSeries) },
+    { label:'International benchmark', color:'#3a73a4', points:indexPriceSeries(internationalSeries) }
+  ], { emptyText:pricesReady ? 'Price data is being prepared' : 'Add local market observations to compare with the international benchmark', unit:'' });
+}
+
+function renderProduction() {
+  const records = harvestRecords.length ? harvestRecords : (window.cacaoaiBuiltInHarvestRecords || []).map(normalizeHarvestRecord);
+  const process = window.cacaoaiProductionProcessRecords || { fermentation:[], drying:[], dried:[] };
+  const totalPods = records.reduce((sum, record) => sum + (Number(record.pods) || 0), 0);
+  const totalWet = records.reduce((sum, record) => sum + (Number(record.weightKg) || 0), 0);
+  const weighted = records.filter((record) => Number.isFinite(Number(record.weightKg))).sort((a, b) => Number(b.weightKg) - Number(a.weightKg))[0];
+  $('production-metrics').innerHTML = [
+    ['Harvests logged', records.length, 'field production records'],
+    ['Pods harvested', totalPods.toLocaleString(), 'imported production log'],
+    ['Wet beans', totalWet ? `${totalWet.toFixed(2)} kg` : '—', 'records with weight'],
+    ['Largest harvest', weighted ? `${Number(weighted.weightKg).toFixed(2)} kg` : '—', weighted ? weighted.date : 'not recorded']
+  ].map(([label, value, note]) => `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></article>`).join('');
+  $('production-harvest-table').innerHTML = [...records].sort((a, b) => String(a.date).localeCompare(String(b.date))).map((record) => `<tr><td>${escapeHtml(record.date || '—')}</td><td>${record.pods === null ? '—' : Number(record.pods).toLocaleString()}</td><td>${record.weightKg === null ? '—' : `${Number(record.weightKg).toFixed(2)} kg`}</td><td>${escapeHtml(record.source || 'Production record')}</td></tr>`).join('');
+  $('production-fermentation-grid').innerHTML = process.fermentation.map((batch) => `<article class="production-batch"><div class="production-batch-head"><strong>${escapeHtml(batch.batch)}</strong><span>${escapeHtml(batch.date)}</span></div><b>${escapeHtml(batch.quantity)}</b><p>${escapeHtml(batch.checkpoints)}</p><p>${escapeHtml(batch.status)}</p><small>${escapeHtml(batch.note)}</small></article>`).join('');
+  $('production-drying-table').innerHTML = process.drying.map((row) => `<tr><td>${escapeHtml(row.batch)}</td><td>${escapeHtml(row.start)}</td><td>${escapeHtml(row.kept)}</td><td>${escapeHtml(row.days)}</td><td>${escapeHtml(row.note)}</td></tr>`).join('');
+  $('production-dried-table').innerHTML = process.dried.map((row) => `<tr><td>${escapeHtml(row.batch)}</td><td>${escapeHtml(row.total)}</td><td>${escapeHtml(row.used)}</td><td>${escapeHtml(row.note)}</td></tr>`).join('');
+  document.querySelectorAll('[data-production-tab]').forEach((button) => {
+    button.onclick = () => {
+      const tab = button.dataset.productionTab;
+      document.querySelectorAll('[data-production-tab]').forEach((item) => item.classList.toggle('active', item === button));
+      document.querySelectorAll('.production-panel').forEach((panel) => { panel.hidden = panel.id !== `production-panel-${tab}`; });
+    };
+  });
+}
+
 function renderSignals(targetId) {
   const entries = Object.entries(history.diseaseTypeCounts).sort((a,b) => b[1] - a[1]);
   const max = Math.max(...entries.map(([, value]) => value));
   $(targetId).innerHTML = entries.map(([key, value]) => `<div class="signal-row"><span>${signalNames[key] || key}</span><div class="signal-bar"><i style="width:${Math.round(value / max * 100)}%;background:${key === 'pest' ? '#d79027' : key === 'black_pod' ? '#6d5b55' : '#6b7db0'}"></i></div><strong>${value}</strong></div>`).join('');
+}
+
+function renderModelQuality() {
+  const target = $('model-quality');
+  const status = $('model-quality-status');
+  if (!target || !status) return;
+  const evaluation = analysisSnapshot.evaluation;
+  const errorModel = analysisSnapshot.error_model;
+  if (analysisSnapshot.status !== 'ok' || !evaluation || evaluation.status !== 'ok') {
+    status.textContent = analysisSnapshot.status === 'no-data' ? 'No field uploads' : `Model ${analysisSnapshot.status || 'unavailable'}`;
+    status.className = 'status-badge neutral';
+    target.innerHTML = `<p class="card-note">${cloudSnapshot.photos.length ? 'Not enough confirmed visits for a leave-one-visit-out evaluation yet.' : 'The field-pipeline evaluation appears after photos with confirmed tree IDs arrive from the PWA.'}</p>`;
+    return;
+  }
+  const percent = (value) => Number.isFinite(Number(value)) ? `${Math.round(Number(value) * 100)}%` : '—';
+  const metres = (value) => Number.isFinite(Number(value)) ? `±${Number(value).toFixed(1)}m` : '—';
+  const calibratedError = evaluation.calibrated_calibration_error;
+  status.textContent = `FIELD MODEL ${analysisSnapshot.model_version || 'v2'}`;
+  status.className = 'status-badge neutral';
+  target.innerHTML = `<div class="model-quality-grid"><div class="model-quality-item"><span>LOO accuracy</span><strong>${percent(evaluation.accuracy)}</strong><small>${evaluation.visits} confirmed visits</small></div><div class="model-quality-item"><span>Calibrated ECE</span><strong>${percent(calibratedError)}</strong><small>after temperature ${Number(evaluation.temperature).toFixed(2)}</small></div><div class="model-quality-item"><span>Within-visit GPS</span><strong>${metres(errorModel?.within_visit_sd_m)}</strong><small>shared stop noise</small></div><div class="model-quality-item"><span>Between-visit GPS</span><strong>${metres(errorModel?.between_visit_sd_m)}</strong><small>remaining visit variation</small></div><div class="model-quality-item"><span>Suspect tag checks</span><strong>${evaluation.suspect_confirmed_visits ?? 0}</strong><small>review before changing the ID</small></div><div class="model-quality-item"><span>Registry position error</span><strong>${metres(errorModel?.registry_sd_m)}</strong><small>learned registry prior</small></div></div><p class="model-quality-note"><strong>Interpretation:</strong> GPS proposes a check; the confirmed field ID remains authoritative. The calibrated ECE is shown separately from the raw confidence gap.</p>`;
 }
 
 function renderAreas() {
@@ -450,7 +810,7 @@ function renderAreas() {
 function renderTrees(query = '') {
   const normalized = query.toLowerCase().trim();
   const rows = history.trees.map((tree, index) => ({ tree, index, signals: totalSignals(tree), area: areaForTree(tree) })).filter(({ tree, area }) => `${tree.label} ${area}`.toLowerCase().includes(normalized)).sort((a,b) => b.signals - a.signals || b.tree.pods - a.tree.pods);
-  $('tree-list').innerHTML = rows.map(({ tree, index, signals, area }) => `<button class="tree-row ${selectedTree === tree ? 'selected' : ''}" data-tree-index="${index}"><span class="tree-dot ${signals >= 5 ? 'high' : signals ? 'medium' : 'low'}"></span><span><strong>${tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label}</strong><small>Area ${area} · ${tree.photos?.length || 0} photos · ${tree.pods} pod detections</small></span><em>${signals} signals</em></button>`).join('');
+  $('tree-list').innerHTML = rows.map(({ tree, index, signals, area }) => { const linkage = nearestRegisteredTree(tree); const record = linkage && linkage.distance <= 12 ? analysisTreeRecord(linkage.candidate) : null; const modelLine = record ? ` · ${record.photo_count} model-linked` : ''; return `<button class="tree-row ${selectedTree === tree ? 'selected' : ''}" data-tree-index="${index}"><span class="tree-dot ${signals >= 5 ? 'high' : signals ? 'medium' : 'low'}"></span><span><strong>${tree.label.match(/木\s+([^（]+)/)?.[1] || tree.label}</strong><small>Area ${area} · ${tree.photos?.length || 0} photos · ${tree.pods} pod detections${modelLine}</small></span><em>${signals} signals</em></button>`; }).join('');
   document.querySelectorAll('.tree-row').forEach((row) => row.addEventListener('click', () => openTree(Number(row.dataset.treeIndex))));
   $('tree-count-label').textContent = history.trees.length;
 }
@@ -462,7 +822,12 @@ function openTree(index) {
   const signals = totalSignals(selectedTree);
   const area = areaForTree(selectedTree);
   const kindList = Object.entries(selectedTree.flagged || {}).map(([key, value]) => `${signalNames[key] || key} ${value}`).join(' · ') || 'No flagged pod';
-  $('tree-detail').innerHTML = `<div class="detail-header"><div><p class="eyebrow">Selected tree group</p><h2>${selectedTree.label.match(/木\s+([^（]+)/)?.[1] || selectedTree.label}</h2></div><span class="status-badge ${signals ? 'priority' : 'neutral'}">${signals ? 'Field confirmation' : 'No flagged history'}</span></div><p class="section-note">${selectedTree.label}</p><div class="detail-kpis"><div><small>Photos</small><strong>${selectedTree.photos?.length || 0}</strong></div><div><small>Pod detections</small><strong>${selectedTree.pods}</strong></div><div><small>Signals</small><strong>${signals}</strong></div></div><div class="detail-lines"><span><span>Mapped area</span><strong>Area ${area}</strong></span><span><span>GPS</span><strong>${selectedTree.lat.toFixed(6)}, ${selectedTree.lon.toFixed(6)}</strong></span><span><span>Signal types</span><strong>${kindList}</strong></span><span><span>Next action</span><strong>${signals ? 'Start the next field check here' : 'Keep monitoring'}</strong></span></div><button class="primary-button detail-action" type="button" id="detail-action-button">＋ Record field action</button>`;
+  const registryMatch = nearestRegisteredTree(selectedTree);
+  const estimate = registryMatch && registryMatch.distance <= 12 ? treePositionEstimate(registryMatch.candidate) : null;
+  const positionLine = registryMatch && registryMatch.distance <= 12 ? `${registryMatch.candidate.number} · ${positionSummary(estimate)}` : 'No registered tree position linked';
+  const modelRecord = registryMatch && registryMatch.distance <= 12 ? analysisTreeRecord(registryMatch.candidate) : null;
+  const modelLine = modelRecord ? `${modelRecord.photo_count} PWA photo${modelRecord.photo_count === 1 ? '' : 's'} linked · ${Math.round(modelRecord.mean_assignment_confidence * 100)}% mean assignment confidence · ${modelRecord.confirmed_photo_count} confirmed / ${modelRecord.inferred_photo_count} inferred` : 'No local model link yet';
+  $('tree-detail').innerHTML = `<div class="detail-header"><div><p class="eyebrow">Selected tree group</p><h2>${selectedTree.label.match(/木\s+([^（]+)/)?.[1] || selectedTree.label}</h2></div><span class="status-badge ${signals ? 'priority' : 'neutral'}">${signals ? 'Field confirmation' : 'No flagged history'}</span></div><p class="section-note">${selectedTree.label}</p><div class="detail-kpis"><div><small>Photos</small><strong>${selectedTree.photos?.length || 0}</strong></div><div><small>Pod detections</small><strong>${selectedTree.pods}</strong></div><div><small>Signals</small><strong>${signals}</strong></div></div><div class="detail-lines"><span><span>Mapped area</span><strong>Area ${area}</strong></span><span><span>GPS group</span><strong>${selectedTree.lat.toFixed(6)}, ${selectedTree.lon.toFixed(6)}</strong></span><span><span>Registered tree</span><strong>${positionLine}</strong></span><span><span>Photo linkage</span><strong>${modelLine}</strong></span><span><span>Signal types</span><strong>${kindList}</strong></span><span><span>Next action</span><strong>${signals ? 'Start the next field check here' : 'Keep monitoring'}</strong></span></div><button class="primary-button detail-action" type="button" id="detail-action-button">＋ Record field action</button>`;
   $('detail-action-button').addEventListener('click', () => { showToast('Field action entry will be linked to this tree in the next sync slice.'); openView('actions'); });
   openView('trees');
 }
@@ -470,7 +835,7 @@ function openTree(index) {
 function renderPhotos(filter = 'all') {
   const records = history.trees.flatMap((tree) => (tree.photos || []).filter((photo) => photo.flagged || photo.pods || photo.cloud).map((photo) => ({ ...photo, tree, area: photo.areaId || areaForTree(tree), signals: photo.signalType ? [photo.signalType] : Object.keys(tree.flagged || {}) }))).filter((record) => filter === 'all' || record.signals.includes(filter)).sort((a,b) => (b.flagged - a.flagged) || (b.pods - a.pods)).slice(0, 18);
   $('photo-count-label').textContent = history.totalPhotos;
-  $('photo-review-grid').innerHTML = records.map((record) => { const pending = record.cloud && !record.flagged && !record.pods; const sourceLink = record.driveUrl ? `<a class="small-button photo-source" href="${escapeHtml(record.driveUrl)}" target="_blank" rel="noopener">Open source photo ↗</a>` : ''; return `<article class="photo-card"><h3>${escapeHtml(record.name)}</h3><p>${escapeHtml(record.tree.label)} · Area ${escapeHtml(record.area)}</p><div class="tag-row"><span class="tag ${record.flagged ? 'alert' : ''}">${record.flagged ? `${record.flagged} flagged` : pending ? 'Awaiting AI screening' : 'No flagged pod'}</span><span class="tag">${record.pods} pod${record.pods === 1 ? '' : 's'}</span><span class="tag">${record.cloud ? 'Synced from PWA' : 'Historical snapshot'}</span></div><div class="photo-card-actions">${sourceLink}<button class="small-button photo-open" data-tree-index="${history.trees.indexOf(record.tree)}" type="button">Open tree record →</button></div></article>`; }).join('');
+  $('photo-review-grid').innerHTML = records.map((record) => { const pending = record.cloud && !record.flagged && !record.pods; const sourceLink = record.driveUrl ? `<a class="small-button photo-source" href="${escapeHtml(record.driveUrl)}" target="_blank" rel="noopener">Open source photo ↗</a>` : ''; const linkage = analysisPhotoLink(record); const linkageTag = `<span class="tag ${linkage?.id_check === 'suspect' ? 'alert' : ''}">${analysisLinkLine(linkage)}</span>`; return `<article class="photo-card"><h3>${escapeHtml(record.name)}</h3><p>${escapeHtml(record.tree.label)} · Area ${escapeHtml(record.area)}</p><div class="tag-row"><span class="tag ${record.flagged ? 'alert' : ''}">${record.flagged ? `${record.flagged} flagged` : pending ? 'Awaiting AI screening' : 'No flagged pod'}</span><span class="tag">${record.pods} pod${record.pods === 1 ? '' : 's'}</span><span class="tag">${record.cloud ? 'Synced from PWA' : 'Historical snapshot'}</span>${linkageTag}</div><div class="photo-card-actions">${sourceLink}<button class="small-button photo-open" data-tree-index="${history.trees.indexOf(record.tree)}" type="button">Open tree record →</button></div></article>`; }).join('');
   document.querySelectorAll('.photo-open').forEach((button) => button.addEventListener('click', () => openTree(Number(button.dataset.treeIndex))));
 }
 
@@ -482,7 +847,7 @@ function renderReport() {
 }
 
 function openArea(area) { showToast(`Area ${area} selected. Opening the area workload.`); openView('areas'); document.querySelectorAll('[data-area]').forEach((row) => row.classList.toggle('selected', row.dataset.area === area)); }
-function openView(view) { currentView = view; document.querySelectorAll('.view').forEach((section) => section.classList.toggle('active', section.id === `view-${view}`)); document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === view)); $('page-title').textContent = ({ overview:'Farm dashboard', areas:'Areas', trees:'Tree records', photos:'Photo review', actions:'Field actions', report:'Weekly report' })[view]; window.scrollTo({ top:0, behavior:'smooth' }); }
+function openView(view) { currentView = view; document.querySelectorAll('.view').forEach((section) => section.classList.toggle('active', section.id === `view-${view}`)); document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === view)); $('page-title').textContent = ({ overview:'Farm dashboard', areas:'Areas', trees:'Tree records', photos:'Photo review', actions:'Field actions', report:'Weekly report', production:'Production records' })[view]; window.scrollTo({ top:0, behavior:'smooth' }); }
 
 async function loadData() {
   setCloudStatus('LOADING CLOUD…', 'neutral');
@@ -495,14 +860,24 @@ async function loadData() {
     fieldActions = [...cloudSnapshot.actions.map(normalizeCloudAction), ...loadFieldActions()];
     setCloudStatus(`${cloudSnapshot.photos.length} PWA UPLOADS${cloudSnapshot.status === 'partial' ? ' · PARTIAL' : ''}`, cloudSnapshot.status === 'partial' ? 'warning' : 'connected');
   } catch (error) {
-    cloudSnapshot = { photos:[], actions:[], status:'fallback', error:error.message };
+    cloudSnapshot = { photos:[], actions:[], harvestRecords:[], marketPrices:[], status:'fallback', error:error.message };
     history = baseHistory;
     fieldActions = loadFieldActions();
     setCloudStatus('STATIC FALLBACK', 'warning');
     console.warn('Cloud snapshot unavailable; using local historical data.', error);
   }
+  rebuildTreePositionEstimates();
+  await runLocalAnalysis();
   scanOptions = buildScanOptions();
-  renderScanTimeline(); renderMetrics(); renderMap(); renderPriority(); renderSignals('signal-list'); renderAreas(); renderTrees(); renderPhotos(); renderReport(); renderEffectiveness(); renderActionLog();
+  // Show the map and records first: weather and international prices come from outside
+  // services through the local server and can take up to the request timeout (12 s).
+  renderAll();
+  await loadExternalContext();
+  renderAll();
+}
+
+function renderAll() {
+  renderScanTimeline(); renderMetrics(); renderMap(); renderPriority(); renderSignals('signal-list'); renderModelQuality(); renderAreas(); renderTrees(); renderPhotos(); renderReport(); renderStatisticsDashboard(); renderProduction(); renderEffectiveness(); renderActionLog();
 }
 
 document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => openView(button.dataset.view)));
@@ -511,5 +886,32 @@ $('photo-filter').addEventListener('change', (event) => renderPhotos(event.targe
 $('refresh-data').addEventListener('click', async () => { try { await loadData(); showToast(cloudSnapshot.status === 'connected' ? 'Cloud data refreshed.' : 'Historical snapshot refreshed.'); } catch (error) { setCloudStatus('LOAD ERROR', 'warning'); showToast(error.message); } });
 $('new-action').addEventListener('click', () => { openView('actions'); setTimeout(() => $('action-target').focus(), 50); });
 $('action-form').addEventListener('submit', (event) => { event.preventDefault(); fieldActions.unshift({ id: Date.now(), target: $('action-target').value.trim(), treatment: $('action-treatment').value.trim(), actionDate: $('action-date').value, recheckDate: $('action-recheck').value, note: $('action-note').value.trim() }); saveFieldActions(); renderActionLog(); renderEffectiveness(); event.target.reset(); showToast('Field action saved locally.'); });
+$('harvest-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const target = $('harvest-target').value.trim();
+  const isArea = /^area\s+/i.test(target);
+  const record = {
+    id: `harvest-${Date.now()}`,
+    harvest_date: $('harvest-date').value,
+    weight_kg: Number($('harvest-weight').value),
+    area_id: isArea ? target.replace(/^area\s+/i, '') : null,
+    tree_id: isArea || !target ? null : target.replace(/^tree\s+/i, ''),
+    grade: $('harvest-grade').value.trim() || null,
+    source: 'Desktop harvest record'
+  };
+  try {
+    const saved = await window.cacaoaiCloud.createHarvestRecord(record);
+    harvestRecords.unshift(normalizeHarvestRecord({ ...saved, source:'Supabase harvest record' }));
+    $('harvest-entry-status').textContent = 'Saved to Supabase harvest_records.';
+  } catch (error) {
+    const drafts = [record, ...loadHarvestDrafts()];
+    saveHarvestDrafts(drafts);
+    harvestRecords.unshift(normalizeHarvestRecord(record));
+    $('harvest-entry-status').textContent = `Saved as a local draft (${error.message}). Create harvest_records and its RLS policy to sync it.`;
+  }
+  renderStatisticsDashboard();
+  event.target.reset();
+  showToast('Harvest record saved.');
+});
 $('download-report').addEventListener('click', () => { const lines = [`Valencia DA Pilot Farm — scan ${history.scanDate}`, `Scanned photos: ${history.totalPhotos}`, `Disease signals: ${history.diseasedPhotos}`, `Tree records: ${history.trees.length}`, ...Object.entries(history.diseaseTypeCounts).map(([key, value]) => `${signalNames[key] || key}: ${value}`)]; const blob = new Blob([lines.join('\n')], { type:'text/plain' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'valencia-cacao-weekly-summary.txt'; link.click(); URL.revokeObjectURL(link.href); });
 loadData().catch((error) => { $('map-status').textContent = error.message; showToast(error.message); });
